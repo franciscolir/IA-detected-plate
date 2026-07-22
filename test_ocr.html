@@ -7,56 +7,65 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
   <style>
     body { background: #0b0f14; color: #e6edf3; font-family: system-ui, sans-serif; }
-    .video-box { position: relative; background: #000; width: 100%; aspect-ratio: 16/9; }
-    #video { width: 100%; height: 100%; object-fit: cover; }
-    #overlay { position: absolute; inset: 0; pointer-events: none; }
-    #crop-view { background: #000; border: 1px solid #333; min-height: 48px; max-height: 96px; }
     .log-box { background: #0a0a0a; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.7rem; height: 250px; overflow-y: auto; padding: 0.4rem; }
-    .config-preview { font-family: monospace; font-size: 0.7rem; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; padding: 0.4rem; max-height: 150px; overflow-y: auto; }
     .controls label { font-size: 0.75rem; }
-    .char-grid { display: flex; gap: 4px; flex-wrap: wrap; }
-    .char-grid .char { background: #1a1a2e; border: 1px solid #333; border-radius: 4px; padding: 2px 6px; font-family: monospace; font-size: 0.8rem; text-align: center; min-width: 24px; }
-    .char-grid .char .conf { font-size: 0.55rem; color: #888; display: block; }
+    .char-grid { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .char-grid .char { background: #1a1a2e; border: 1px solid #333; border-radius: 4px; padding: 4px 8px; font-family: monospace; font-size: 1.1rem; text-align: center; min-width: 32px; }
+    .char-grid .char .conf { font-size: 0.6rem; color: #888; display: block; }
+    .img-preview { max-width: 100%; max-height: 300px; border-radius: 6px; border: 1px solid #333; }
+    .result-card { background: #131a23; border: 1px solid #333; border-radius: 6px; padding: 0.6rem; margin-top: 0.5rem; }
+    .result-card .plate { font-family: monospace; font-size: 1.4rem; font-weight: 700; letter-spacing: 0.1em; }
+    .result-card .plate.ok { color: #00d26a; }
+    .result-card .plate.fail { color: #ff4d4d; }
+    .image-list { max-height: 400px; overflow-y: auto; }
+    .image-item { cursor: pointer; border: 2px solid transparent; border-radius: 6px; transition: border-color 0.2s; }
+    .image-item:hover { border-color: #555; }
+    .image-item.active { border-color: #88ccff; }
   </style>
 </head>
 <body>
 <div class="container-fluid p-2">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <span class="small text-secondary"><a href="index.html" class="text-info">&larr; Inicio</a> &nbsp; Test OCR</span>
-    <span id="fps" class="small text-secondary">FPS --</span>
   </div>
+
+  <!-- Upload -->
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <label class="btn btn-primary btn-sm mb-0">
+      Subir im&aacute;genes <input type="file" id="file-input" accept="image/*" multiple style="display:none" />
+    </label>
+    <button id="btn-clear" class="btn btn-outline-secondary btn-sm">Limpiar todo</button>
+    <div class="small text-secondary ms-2" id="upload-count">0 im&aacute;genes</div>
+  </div>
+
   <div class="row g-2">
-    <div class="col-12 col-lg-7">
-      <div class="video-box">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="overlay" class="overlay"></canvas>
-      </div>
-      <canvas id="crop-view" class="w-100 mt-1" style="image-rendering:pixelated"></canvas>
-      <div class="d-flex gap-2 mt-1">
-        <button id="btn-start" class="btn btn-success btn-sm flex-fill">Iniciar</button>
-        <button id="btn-stop" class="btn btn-outline-secondary btn-sm flex-fill" disabled>Detener</button>
-      </div>
-    </div>
+    <!-- Left: image list -->
     <div class="col-12 col-lg-5">
-      <ul class="nav nav-tabs nav-fill small mb-2">
-        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-ocr">OCR</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-log">Log</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-config">Config</button></li>
-      </ul>
-      <div class="tab-content">
-        <div class="tab-pane active" id="tab-ocr">
-          <div class="char-grid mb-2" id="char-grid"></div>
-          <div id="raw-result" class="mb-1 small"></div>
-          <div class="controls small">
-            <div class="mb-1"><label>Min height <span id="val-ocr-h">48</span></label><input type="range" class="form-range" id="param-ocr-h" min="16" max="96" step="8" value="48" /></div>
-          </div>
+      <div class="image-list" id="image-list"></div>
+    </div>
+
+    <!-- Right: selected image + OCR result -->
+    <div class="col-12 col-lg-7">
+      <div id="selected-view" class="text-center text-secondary small py-4">Seleccion&aacute; una imagen o sub&iacute; una nueva</div>
+
+      <!-- OCR controls -->
+      <div class="row g-1 mt-1 controls small">
+        <div class="col-6">
+          <label>Input height <span id="val-h">48</span></label>
+          <input type="range" class="form-range" id="param-h" min="16" max="96" step="8" value="48" />
         </div>
-        <div class="tab-pane" id="tab-log"><div class="log-box" id="log-box">[Listo]</div></div>
-        <div class="tab-pane" id="tab-config"><div class="config-preview" id="config-preview">--</div></div>
+        <div class="col-6">
+          <label>Min conf <span id="val-conf">0.01</span></label>
+          <input type="range" class="form-range" id="param-conf" min="0.01" max="0.50" step="0.01" value="0.01" />
+        </div>
       </div>
+
+      <div id="result-area"></div>
+      <div class="log-box mt-1" id="log-box">[Listo] Sub&iacute; im&aacute;genes para analizar</div>
     </div>
   </div>
 </div>
+
 <script type="importmap">{"imports":{"onnxruntime-web":"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.mjs"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module">
@@ -64,23 +73,26 @@ import * as ort from 'onnxruntime-web';
 import { validatePlate, normalizePlate } from './assets/js/validator.js';
 import { Corrector } from './assets/js/corrector.js';
 
-let ocrSession, corrector, stream, running;
-const video = document.getElementById('video');
-const overlay = document.getElementById('overlay');
-const cropView = document.getElementById('crop-view');
+let ocrSession, ppocrKeys, corrector;
+let images = []; // { id, dataUrl, file }
+let selectedId = null;
+
+const fileInput = document.getElementById('file-input');
+const imageList = document.getElementById('image-list');
+const selectedView = document.getElementById('selected-view');
+const resultArea = document.getElementById('result-area');
 const logBox = document.getElementById('log-box');
-const charGrid = document.getElementById('char-grid');
-const rawResult = document.getElementById('raw-result');
-let ppocrKeys = null;
-let frameCount = 0, lastFpsTime = performance.now();
+const uploadCount = document.getElementById('upload-count');
 
 function log(msg, type = 'info') {
-  const d = document.createElement('div'); d.className = type; d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  const d = document.createElement('div'); d.className = type;
+  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
   logBox.appendChild(d); logBox.scrollTop = logBox.scrollHeight;
 }
 
+// ─── Load models ────────────────────────────────
 async function load() {
-  log('Cargando modelos...');
+  log('Cargando OCR...');
   try {
     ocrSession = await ort.InferenceSession.create('assets/models/ppocr_rec.onnx', { executionProviders: ['wasm'] });
     log('OCR cargado', 'ok');
@@ -91,124 +103,164 @@ async function load() {
     log(`Keys: ${ppocrKeys.length} caracteres`, 'ok');
   } catch (e) { log('Error keys: ' + e.message, 'err'); }
   corrector = new Corrector();
+  log('Listo', 'ok');
 }
 await load();
 
-async function start() {
-  stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'environment' } });
-  video.srcObject = stream; await video.play();
-  running = true;
-  document.getElementById('btn-start').disabled = true;
-  document.getElementById('btn-stop').disabled = false;
-  log('Iniciado', 'ok');
-  loop();
+// ─── File upload ────────────────────────────────
+fileInput.addEventListener('change', () => {
+  for (const file of fileInput.files) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      images.push({ id, dataUrl: e.target.result, file, result: null });
+      renderList();
+      selectImage(id);
+      processImage(id);
+    };
+    reader.readAsDataURL(file);
+  }
+  fileInput.value = '';
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  images = []; selectedId = null;
+  renderList();
+  selectedView.innerHTML = '<div class="text-center text-secondary small py-4">Seleccion&aacute; una imagen o sub&iacute; una nueva</div>';
+  resultArea.innerHTML = '';
+  logBox.innerHTML = '<div>[Log limpiado]</div>';
+});
+
+// ─── Image list ─────────────────────────────────
+function renderList() {
+  imageList.innerHTML = '';
+  uploadCount.textContent = `${images.length} im&aacute;genes`;
+  images.forEach(img => {
+    const div = document.createElement('div');
+    div.className = `image-item p-1 ${img.id === selectedId ? 'active' : ''}`;
+    div.innerHTML = `<img src="${img.dataUrl}" class="img-preview" style="max-height:80px;width:100%;object-fit:cover;" />`;
+    div.onclick = () => selectImage(img.id);
+    imageList.appendChild(div);
+  });
 }
-function stop() {
-  running = false;
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  video.srcObject = null;
-  document.getElementById('btn-start').disabled = false;
-  document.getElementById('btn-stop').disabled = true;
-  log('Detenido', 'warn');
+
+function selectImage(id) {
+  selectedId = id;
+  renderList();
+  const img = images.find(i => i.id === id);
+  if (!img) return;
+  selectedView.innerHTML = `<img src="${img.dataUrl}" class="img-preview" />`;
+  renderResult(id);
 }
-document.getElementById('btn-start').addEventListener('click', start);
-document.getElementById('btn-stop').addEventListener('click', stop);
 
-async function loop() {
-  if (!running || !video.videoWidth) { requestAnimationFrame(loop); return; }
-  if (overlay.width !== video.videoWidth) { overlay.width = video.videoWidth; overlay.height = video.videoHeight; }
+// ─── Process image ──────────────────────────────
+async function processImage(id) {
+  const img = images.find(i => i.id === id);
+  if (!img || !ocrSession) return;
 
-  const params = { ocrH: parseInt(document.getElementById('param-ocr-h').value) };
-  document.getElementById('config-preview').textContent = JSON.stringify(params);
+  const params = {
+    h: parseInt(document.getElementById('param-h').value),
+    conf: parseFloat(document.getElementById('param-conf').value),
+  };
 
-  // Draw crosshair
-  const ctx = overlay.getContext('2d');
-  ctx.clearRect(0, 0, overlay.width, overlay.height);
-  ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
-  const cx = overlay.width/2, cy = overlay.height/2;
-  ctx.beginPath(); ctx.moveTo(cx-30, cy); ctx.lineTo(cx+30, cy);
-  ctx.moveTo(cx, cy-30); ctx.lineTo(cx, cy+30); ctx.stroke();
+  const src = new Image();
+  src.src = img.dataUrl;
+  await src.decode();
 
-  // Crop center
-  const cropW = 200, cropH = 48;
-  const sx = Math.round(cx - cropW/2), sy = Math.round(cy - cropH/2);
-  ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 2;
-  ctx.strokeRect(sx, sy, cropW, cropH);
+  const cropW = Math.min(320, src.width);
+  const cropH = Math.min(48, src.height * cropW / src.width);
 
-  const crop = document.createElement('canvas');
-  crop.width = cropW; crop.height = cropH;
-  crop.getContext('2d').drawImage(video, sx, sy, cropW, cropH, 0, 0, cropW, cropH);
+  const c = document.createElement('canvas');
+  c.width = cropW; c.height = cropH;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(src, 0, 0, cropW, cropH);
 
-  // Show crop
-  cropView.width = cropW; cropView.height = cropH;
-  cropView.getContext('2d').drawImage(crop, 0, 0);
+  const newH = params.h;
+  const newW = Math.max(1, Math.round(cropW * (newH / cropH)));
+  const d = document.createElement('canvas');
+  d.width = newW; d.height = newH;
+  d.getContext('2d').drawImage(c, 0, 0, newW, newH);
+  const rgba = d.getContext('2d').getImageData(0, 0, newW, newH).data;
 
-  // OCR
-  if (ocrSession) {
-    const newH = params.ocrH;
-    const newW = Math.max(1, Math.round(cropW * (newH / cropH)));
-    const c = document.createElement('canvas');
-    c.width = cropW; c.height = cropH;
-    c.getContext('2d').drawImage(crop, 0, 0);
-    const d = document.createElement('canvas');
-    d.width = newW; d.height = newH;
-    d.getContext('2d').drawImage(c, 0, 0, newW, newH);
-    const rgba = d.getContext('2d').getImageData(0, 0, newW, newH).data;
-
-    const nchw = new Float32Array(3 * newH * newW);
-    for (let y = 0; y < newH; y++) {
-      for (let x = 0; x < newW; x++) {
-        const si = (y * newW + x) * 4;
-        const di = y * newW + x;
-        nchw[di] = rgba[si] / 127.5 - 1.0;
-        nchw[1*newH*newW + di] = rgba[si+1] / 127.5 - 1.0;
-        nchw[2*newH*newW + di] = rgba[si+2] / 127.5 - 1.0;
-      }
-    }
-    const tensor = new ort.Tensor('float32', nchw, [1, 3, newH, newW]);
-    const results = await ocrSession.run({ x: tensor });
-    const output = results[ocrSession.outputNames[0]];
-
-    // Char probabilities
-    const timeSteps = output.dims[1], vocabSize = output.dims[2];
-    const data = output.data;
-    charGrid.innerHTML = '';
-    let prev = 0, text = '';
-    for (let t = 0; t < timeSteps; t++) {
-      let bestIdx = 0, bestVal = -Infinity;
-      const offset = t * vocabSize;
-      for (let v = 0; v < vocabSize; v++) {
-        if (data[offset + v] > bestVal) { bestVal = data[offset + v]; bestIdx = v; }
-      }
-      const conf = Math.exp(bestVal); // softmax approx
-      if (bestIdx !== 0 && bestIdx !== prev) {
-        const ch = ppocrKeys ? (ppocrKeys[bestIdx] || '?') : '?';
-        text += ch;
-        const el = document.createElement('span');
-        el.className = 'char';
-        el.innerHTML = `${ch}<span class="conf">${(conf*100).toFixed(0)}%</span>`;
-        charGrid.appendChild(el);
-      }
-      prev = bestIdx;
-    }
-    rawResult.innerHTML = `<strong>OCR:</strong> "${text}"`;
-    if (text) {
-      const normalized = normalizePlate(text);
-      const corrected = corrector.correct(normalized);
-      const valid = validatePlate(corrected) && corrected.length === 6;
-      rawResult.innerHTML += ` &rarr; <strong>${valid ? '✅' : '❌'} ${corrected}</strong>`;
-      log(`"${text}" → "${normalized}" → "${corrected}" ${valid ? '✅' : '❌'}`, valid ? 'ok' : 'info');
+  const nchw = new Float32Array(3 * newH * newW);
+  for (let y = 0; y < newH; y++) {
+    for (let x = 0; x < newW; x++) {
+      const si = (y * newW + x) * 4;
+      const di = y * newW + x;
+      nchw[di] = rgba[si] / 127.5 - 1.0;
+      nchw[1 * newH * newW + di] = rgba[si + 1] / 127.5 - 1.0;
+      nchw[2 * newH * newW + di] = rgba[si + 2] / 127.5 - 1.0;
     }
   }
 
-  frameCount++;
-  const now = performance.now();
-  if (now - lastFpsTime >= 1000) {
-    document.getElementById('fps').textContent = `FPS ${frameCount}`;
-    frameCount = 0; lastFpsTime = now;
+  const tensor = new ort.Tensor('float32', nchw, [1, 3, newH, newW]);
+  const results = await ocrSession.run({ x: tensor });
+  const output = results[ocrSession.outputNames[0]];
+  const data = output.data;
+  const timeSteps = output.dims[1], vocabSize = output.dims[2];
+
+  // Decode with character grid
+  const chars = [];
+  let prev = 0, text = '';
+  for (let t = 0; t < timeSteps; t++) {
+    let bestIdx = 0, bestVal = -Infinity;
+    const offset = t * vocabSize;
+    for (let v = 0; v < Math.min(vocabSize, params.conf > 0 ? vocabSize : 0); v++) {
+      if (data[offset + v] > bestVal) { bestVal = data[offset + v]; bestIdx = v; }
+    }
+    const conf = 1 / (1 + Math.exp(-bestVal)); // sigmoid approx
+
+    if (bestIdx !== 0 && bestIdx !== prev && conf >= params.conf) {
+      const ch = ppocrKeys ? (ppocrKeys[bestIdx] || '·') : '·';
+      text += ch;
+      chars.push({ char: ch, conf });
+    } else if (bestIdx === 0 || bestIdx === prev) {
+      // blank or repeat
+    }
+    prev = bestIdx;
   }
-  requestAnimationFrame(loop);
+
+  const normalized = normalizePlate(text);
+  const corrected = corrector.correct(normalized);
+  const valid = validatePlate(corrected) && corrected.length === 6;
+
+  img.result = { chars, text, normalized, corrected, valid, params };
+  log(`"${text}" → "${corrected}" ${valid ? '✅' : '❌'}`, valid ? 'ok' : 'info');
+
+  if (id === selectedId) renderResult(id);
 }
+
+function renderResult(id) {
+  const img = images.find(i => i.id === id);
+  if (!img || !img.result) { resultArea.innerHTML = '<div class="text-secondary small mt-2">Procesando...</div>'; return; }
+  const r = img.result;
+
+  let html = '<div class="result-card">';
+  html += `<div class="char-grid mb-1">`;
+  for (const ch of r.chars) {
+    html += `<span class="char">${ch.char}<span class="conf">${(ch.conf*100).toFixed(0)}%</span></span>`;
+  }
+  html += `</div>`;
+  html += `<div class="d-flex justify-content-between align-items-center">
+    <span class="plate ${r.valid ? 'ok' : 'fail'}">${r.corrected || '---'}</span>
+    <span class="small ${r.valid ? 'text-success' : 'text-danger'}">${r.valid ? '✅ V&aacute;lida' : '❌ Inv&aacute;lida'}</span>
+  </div>`;
+  html += `<div class="small text-secondary mt-1">OCR crudo: "${r.text}" &rarr; normalizado: "${r.normalized}"</div>`;
+  html += `<div class="small text-secondary">Params: ${JSON.stringify(r.params)}</div>`;
+  html += '</div>';
+  resultArea.innerHTML = html;
+}
+
+// ─── Param changes reprocess ─────────────────────
+document.querySelectorAll('#param-h, #param-conf').forEach(el => {
+  el.addEventListener('input', () => {
+    const id = el.id.replace('param-', '');
+    document.getElementById(`val-${id}`).textContent = el.value;
+    // Reprocess all images
+    images.forEach(img => { img.result = null; });
+    images.forEach(img => processImage(img.id));
+  });
+});
 </script>
 </body>
 </html>

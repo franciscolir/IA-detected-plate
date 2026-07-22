@@ -42,11 +42,14 @@ async function init() {
   detector = new PlateDetector({ inputSize: 640, confThreshold: sensitivity });
   ocr = new PlateOCR();
 
-  setStatus('Cargando modelos...');
-  const [detLoaded, ocrLoaded] = await Promise.all([
-    detector.loadModel(DETECTOR_MODEL),
-    ocr.loadModel(OCR_MODEL),
-  ]);
+  setLoading('Cargando detector...', 'YOLOv8');
+  const detLoaded = await detector.loadModel(DETECTOR_MODEL);
+
+  setLoading('Cargando OCR...', 'PP-OCRv4');
+  const ocrLoaded = await ocr.loadModel(OCR_MODEL);
+
+  setLoading('Modelos listos', '');
+  setTimeout(hideLoading, 500);
 
   if (!detLoaded && !ocrLoaded) setStatus('Modo demo - coloca los .onnx en assets/models/');
   else setStatus('Listo. Presiona Iniciar');
@@ -260,6 +263,17 @@ function resizeOverlay() {
 function setStatus(msg) {
   const el = document.getElementById('status');
   if (el) el.textContent = msg;
+}
+
+function setLoading(text, detail) {
+  const t = document.getElementById('loading-text');
+  const d = document.getElementById('loading-detail');
+  if (t) t.textContent = text;
+  if (d) d.textContent = detail || '';
+}
+
+function hideLoading() {
+  document.getElementById('loading-overlay')?.classList.add('hidden');
 }
 
 init().catch((e) => setStatus('Error: ' + e.message));

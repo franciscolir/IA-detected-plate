@@ -2,36 +2,43 @@
 
 Reconocimiento de patentes chilenas en tiempo real desde el navegador, sin servidor, sin backend, 100% offline con PWA.
 
-## Demo
-
 **[https://franciscolir.github.io/IA-detected-plate/](https://franciscolir.github.io/IA-detected-plate/)**
 
-## Cómo funciona
+## Pipeline
+
+```
+Cámara → YOLOv8 (640x640) → NMS → Crop → PP-OCRv4 → Corrector → Validación → Placa
+                        ↓ (si YOLO no detecta)
+                  Fallback por bordes → Crop → PP-OCRv4 → Corrector → Validación
+```
 
 | M&oacute;dulo | Tecnolog&iacute;a |
 |--------------|-------------------|
 | Detecci&oacute;n | YOLOv8n (ONNX) via onnxruntime-web |
 | OCR | PP-OCRv4 SVTR-LCNet (ONNX) via onnxruntime-web |
-| Fallback | Detecci&oacute;n por proyecci&oacute;n de bordes (cuando YOLO no detecta) |
-| C&aacute;mara | getUsermedia 1280x720 |
+| Fallback | Detecci&oacute;n por proyecci&oacute;n de bordes |
+| C&aacute;mara | getUserMedia 1280x720, zoom digital 1-4x |
 | Almacenamiento | IndexedDB via Dexie.js (solo configuraci&oacute;n) |
-
-### Pipeline
-
-```
-Cámara → YOLOv8 (640x640) → NMS → Crop → PP-OCRv4 → Corrector → Validación
-                        ↓ (si no detecta)
-                  Fallback por bordes → Crop → PP-OCRv4 → Corrector → Validación
-```
 
 ## P&aacute;ginas
 
 | P&aacute;gina | Descripci&oacute;n |
 |--------------|--------------------|
-| `index.html` | Pantalla principal: c&aacute;mara + placa CSS + inicio/detenci&oacute;n |
-| `test_camera.html` | Test completo con par&aacute;metros ajustables y logs |
-| `test_ocr.html` | Test espec&iacute;fico de OCR con grid de caracteres |
-| `test_detector.html` | Test de detector con estad&iacute;sticas YOLO y fallback |
+| [`index.html`](https://franciscolir.github.io/IA-detected-plate/) | Pantalla principal: c&aacute;mara + placa CSS chilena + detecci&oacute;n en vivo |
+| [`test_camera.html`](https://franciscolir.github.io/IA-detected-plate/test_camera.html) | Test completo con c&aacute;mara: todos los par&aacute;metros ajustables, logs en vivo, historial de detecciones con configuraci&oacute;n exportable |
+| [`test_ocr.html`](https://franciscolir.github.io/IA-detected-plate/test_ocr.html) | Test OCR con subida de im&aacute;genes: sub&iacute; placas recortadas, muestra caracteres con % de confianza, ajuste de input height y min confidence |
+| [`test_detector.html`](https://franciscolir.github.io/IA-detected-plate/test_detector.html) | Test detector con subida de im&aacute;genes: sub&iacute; fotos de autos, YOLO + fallback marcan la placa, estad&iacute;sticas de detecci&oacute;n |
+
+## Par&aacute;metros ajustables
+
+| Par&aacute;metro | Rango | Default | Descripci&oacute;n |
+|----------------|-------|---------|-------------------|
+| Sensibilidad | 0.05-0.50 | 0.15 | Confianza m&iacute;nima para aceptar detecciones YOLO |
+| Streak | 1-10 | 3 | Lecturas consecutivas id&eacute;nticas para confirmar placa |
+| No-detect frames | 5-60 | 20 | Frames sin detecci&oacute;n antes de limpiar la placa |
+| IoU NMS | 0.10-0.90 | 0.45 | Intersecci&oacute;n sobre uni&oacute;n para filtrar cajas duplicadas |
+| Input size | 320-640 | 640 | Tama&ntilde;o de entrada del detector YOLO |
+| Fallback edge | 0.03-0.30 | 0.12 | Umbral de gradiente para detecci&oacute;n por bordes |
 
 ## Modelos
 
@@ -39,9 +46,25 @@ Cámara → YOLOv8 (640x640) → NMS → Crop → PP-OCRv4 → Corrector → Val
 - `assets/models/ppocr_rec.onnx` — PP-OCRv4 SVTR-LCNet para reconocimiento de texto
 - `assets/models/ppocr_keys.json` — Diccionario CTC de 6625 caracteres
 
+## Placa CSS
+
+La placa chilena se renderiza con CSS puro:
+- Fondo blanco con acabado met&aacute;lico (degradado + brillo diagonal)
+- Borde negro 4px, esquinas redondeadas 10px
+- Tipograf&iacute;a Arial Black, peso 900
+- Formato `ABCD · 12` o `AB · 1234` con punto medio separador
+- Animaci&oacute;n al detectar
+
 ## Entrenamiento
 
-Ver `training/colab_train.ipynb` para entrenar en Google Colab.
+### Google Colab (recomendado)
+
+```bash
+# Abrir training/colab_train.ipynb en colab.research.google.com
+# Subir datasets ZIP, ejecutar celdas en orden
+```
+
+### Local
 
 ```bash
 cd training
@@ -49,12 +72,17 @@ pip install -r requirements.txt
 python train_yolo.py
 ```
 
+El notebook soporta:
+- M&uacute;ltiples datasets ZIP (se unifican autom&aacute;ticamente)
+- Continuar entrenamiento desde `best.pt` anterior
+- Export a ONNX a 640x640
+- Descarga autom&aacute;tica de `best.onnx` + `best.pt`
+
 ## Desarrollo local
 
 ```bash
 npx serve .
-# o
-python -m http.server 8000
+# o python -m http.server 8000
 # Abrir http://localhost:3000
 ```
 

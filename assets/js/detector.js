@@ -97,9 +97,12 @@ export class PlateDetector {
     return mapped;
   }
 
+  _vw(v) { return v.videoWidth || v.width || 0; }
+  _vh(v) { return v.videoHeight || v.height || 0; }
+
   _preprocess(video) {
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
+    const vw = this._vw(video);
+    const vh = this._vh(video);
     const maxSize = Math.max(vw, vh);
     const isz = this.inputSize;
     const scale = isz / maxSize;
@@ -245,8 +248,8 @@ export class PlateDetector {
   }
 
   _detectFallback(video) {
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
+    const vw = this._vw(video);
+    const vh = this._vh(video);
     if (vw < 50 || vh < 50) return null;
 
     const canvas = document.createElement('canvas');

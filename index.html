@@ -107,9 +107,17 @@
     </div>
 
     <!-- Controls -->
-    <div class="d-flex gap-2 mb-2 justify-content-center">
-      <button id="btn-start" class="btn btn-success px-4">Iniciar</button>
-      <button id="btn-stop" class="btn btn-outline-secondary px-4" disabled>Detener</button>
+    <div class="d-flex flex-column align-items-center gap-2 mb-2">
+      <div class="d-flex gap-2">
+        <button id="btn-start" class="btn btn-success px-4">Iniciar</button>
+        <button id="btn-stop" class="btn btn-outline-secondary px-4" disabled>Detener</button>
+      </div>
+      <div class="btn-group btn-group-sm" role="group">
+        <button class="btn btn-outline-light zoom-btn active" data-zoom="1">1x</button>
+        <button class="btn btn-outline-light zoom-btn" data-zoom="2">2x</button>
+        <button class="btn btn-outline-light zoom-btn" data-zoom="3">3x</button>
+        <button class="btn btn-outline-light zoom-btn" data-zoom="4">4x</button>
+      </div>
     </div>
     <div id="status" class="text-center text-secondary small mb-2">Listo.</div>
 

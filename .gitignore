@@ -1,0 +1,10 @@
+*.onnx
+*.zip
+*.tar
+*.pt
+__pycache__/
+training/__pycache__/
+training/*.zip
+training/dataset/
+assets/models/saved_model_tf/
+assets/models/best.onnx

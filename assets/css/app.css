@@ -1,0 +1,10 @@
+:root { --bg: #0b0f14; --surface: #131a23; --accent: #00d26a; --text: #e6edf3; }
+body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
+a { color: #88ccff; }
+
+/* Plate animation */
+@keyframes plate-pop {
+  0% { transform: rotateX(2deg) rotateY(-2deg) scale(0.8); opacity: 0; }
+  100% { transform: rotateX(2deg) rotateY(-2deg) scale(1); opacity: 1; }
+}
+#plate-display.detected .plate-inner { animation: plate-pop 0.3s ease-out; }

@@ -128,6 +128,10 @@ async function loop() {
     zoomCanvas.width = vw; zoomCanvas.height = vh;
     zoomCanvas.getContext('2d').drawImage(video, sx, sy, cw, ch, 0, 0, vw, vh);
     src = zoomCanvas;
+    video.style.transform = `scale(${zoom})`;
+    video.style.transformOrigin = 'center center';
+  } else {
+    video.style.transform = '';
   }
 
   const boxes = await detector.detect(src, overlayEl);

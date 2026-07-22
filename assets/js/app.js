@@ -24,11 +24,9 @@ let streakCandidate = null;
 let streakCount = 0;
 let streakRequired = 3;
 let noDetectLimit = 20;
-let lastPlateTime = 0;
 
 async function init() {
   const resolution = await getConfig('resolution', '1280x720');
-  const fpsCfg = await getConfig('fps', 30);
   const sensitivity = await getConfig('sensitivity', 0.15);
   streakRequired = await getConfig('streak', 3);
   noDetectLimit = await getConfig('noDetect', 20);
@@ -137,7 +135,6 @@ async function loop() {
             lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
             showPlate(lastPlate);
             streakCount = 0;
-            lastPlateTime = performance.now();
           }
         } else {
           streakCandidate = null; streakCount = 0;

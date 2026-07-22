@@ -30,12 +30,15 @@
   </div>
 
   <!-- Upload -->
-  <div class="d-flex align-items-center gap-2 mb-2">
+  <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
     <label class="btn btn-primary btn-sm mb-0">
-      Subir im&aacute;genes <input type="file" id="file-input" accept="image/*" multiple style="display:none" />
+      Subir imagen de placa <input type="file" id="file-input" accept="image/*" multiple style="display:none" />
     </label>
     <button id="btn-clear" class="btn btn-outline-secondary btn-sm">Limpiar todo</button>
     <div class="small text-secondary ms-2" id="upload-count">0 im&aacute;genes</div>
+  </div>
+  <div class="small text-warning mb-2">
+    ⚠ Sub&iacute; solo la placa recortada (no el auto completo). El OCR procesa toda la imagen como si fuera una placa.
   </div>
 
   <div class="row g-2">
@@ -46,7 +49,7 @@
 
     <!-- Right: selected image + OCR result -->
     <div class="col-12 col-lg-7">
-      <div id="selected-view" class="text-center text-secondary small py-4">Seleccion&aacute; una imagen o sub&iacute; una nueva</div>
+      <div id="selected-view" class="text-center text-secondary small py-4">Sub&iacute; una imagen recortada de placa para analizar</div>
 
       <!-- OCR controls -->
       <div class="row g-1 mt-1 controls small">
@@ -61,7 +64,7 @@
       </div>
 
       <div id="result-area"></div>
-      <div class="log-box mt-1" id="log-box">[Listo] Sub&iacute; im&aacute;genes para analizar</div>
+      <div class="log-box mt-1" id="log-box">[Listo] Sub&iacute; una imagen recortada de placa para analizar</div>
     </div>
   </div>
 </div>

@@ -7,46 +7,50 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
   <style>
     body { background: #0b0f14; color: #e6edf3; font-family: system-ui, sans-serif; }
-    .video-box { position: relative; background: #000; width: 100%; aspect-ratio: 16/9; }
-    #video { width: 100%; height: 100%; object-fit: cover; }
-    #overlay { position: absolute; inset: 0; pointer-events: none; }
     .log-box { background: #0a0a0a; border: 1px solid #333; border-radius: 4px; font-family: monospace; font-size: 0.7rem; height: 250px; overflow-y: auto; padding: 0.4rem; }
-    .config-preview { font-family: monospace; font-size: 0.7rem; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; padding: 0.4rem; max-height: 150px; overflow-y: auto; }
     .controls label { font-size: 0.75rem; }
+    #uploaded-img { max-width: 100%; max-height: 500px; border-radius: 6px; }
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.75rem; }
     .stats-grid .stat { background: #131a23; border: 1px solid #333; border-radius: 4px; padding: 4px 8px; }
     .stats-grid .stat .val { font-weight: 700; font-family: monospace; }
+    #img-container { position: relative; display: inline-block; max-width: 100%; }
+    #img-container canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
   </style>
 </head>
 <body>
 <div class="container-fluid p-2">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <span class="small text-secondary"><a href="index.html" class="text-info">&larr; Inicio</a> &nbsp; Test Detector</span>
-    <span id="fps" class="small text-secondary">FPS --</span>
   </div>
+
+  <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+    <label class="btn btn-primary btn-sm mb-0">
+      Subir imagen <input type="file" id="file-input" accept="image/*" style="display:none" />
+    </label>
+  </div>
+  <div class="small text-warning mb-2">
+    ⚠ Sub&iacute; una foto de auto donde se vea la placa. El detector busca la patente y la marca.
+  </div>
+
   <div class="row g-2">
     <div class="col-12 col-lg-7">
-      <div class="video-box">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="overlay" class="overlay"></canvas>
+      <div id="img-container">
+        <img id="uploaded-img" class="w-100" style="display:none" />
+        <canvas id="overlay"></canvas>
       </div>
-      <div class="d-flex gap-2 mt-1">
-        <button id="btn-start" class="btn btn-success btn-sm flex-fill">Iniciar</button>
-        <button id="btn-stop" class="btn btn-outline-secondary btn-sm flex-fill" disabled>Detener</button>
-      </div>
-      <!-- Stats -->
+
       <div class="stats-grid mt-1" id="stats-grid">
-        <div class="stat">YOLO boxes <span class="val" id="stat-preds">0</span></div>
-        <div class="stat">YOLO high <span class="val" id="stat-high">0</span></div>
-        <div class="stat">Max conf <span class="val" id="stat-maxconf">0%</span></div>
+        <div class="stat">YOLO boxes <span class="val" id="stat-preds">--</span></div>
+        <div class="stat">High conf <span class="val" id="stat-high">--</span></div>
+        <div class="stat">Max conf <span class="val" id="stat-maxconf">--</span></div>
         <div class="stat">Fallback <span class="val" id="stat-fb">--</span></div>
       </div>
     </div>
+
     <div class="col-12 col-lg-5">
       <ul class="nav nav-tabs nav-fill small mb-2">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-params">Par&aacute;metros</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-log">Log</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-config">Config</button></li>
       </ul>
       <div class="tab-content">
         <div class="tab-pane active" id="tab-params">
@@ -56,24 +60,27 @@
             <div class="mb-1"><label>Input size <span id="val-imgsz">640</span></label><input type="range" class="form-range" id="param-imgsz" min="320" max="640" step="32" value="640" /></div>
             <div class="mb-1"><label>Fallback edge <span id="val-edge">0.12</span></label><input type="range" class="form-range" id="param-edge" min="0.03" max="0.30" step="0.01" value="0.12" /></div>
             <div class="mb-1"><label>Fallback minH <span id="val-minh">4</span></label><input type="range" class="form-range" id="param-minh" min="2" max="20" step="1" value="4" /></div>
+            <button id="btn-detect" class="btn btn-success btn-sm mt-1 w-100">Detectar</button>
           </div>
         </div>
-        <div class="tab-pane" id="tab-log"><div class="log-box" id="log-box">[Listo]</div></div>
-        <div class="tab-pane" id="tab-config"><div class="config-preview" id="config-preview">--</div></div>
+        <div class="tab-pane" id="tab-log"><div class="log-box" id="log-box">[Listo] Sub&iacute; una imagen y presion&aacute; Detectar</div></div>
       </div>
     </div>
   </div>
 </div>
+
 <script type="importmap">{"imports":{"onnxruntime-web":"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.mjs"}}</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module">
 import * as ort from 'onnxruntime-web';
 
-let session, stream, running;
-const video = document.getElementById('video');
-const overlay = document.getElementById('overlay');
+let session;
+let currentImg = null;
+
 const logBox = document.getElementById('log-box');
-let frameCount = 0, lastFpsTime = performance.now();
+const imgEl = document.getElementById('uploaded-img');
+const overlay = document.getElementById('overlay');
+const container = document.getElementById('img-container');
 
 function log(msg, type = 'info') {
   const d = document.createElement('div'); d.className = type;
@@ -107,8 +114,68 @@ document.querySelectorAll('#tab-params input').forEach(el => {
   });
 });
 
-function preprocess(video, isz) {
-  const vw = video.videoWidth, vh = video.videoHeight;
+document.getElementById('file-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    currentImg = ev.target.result;
+    imgEl.src = currentImg;
+    imgEl.style.display = 'block';
+    log(`Imagen cargada: ${file.name}`, 'ok');
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+});
+
+document.getElementById('btn-detect').addEventListener('click', detect);
+
+async function detect() {
+  if (!session || !currentImg) { log('Primero sub&iacute; una imagen', 'warn'); return; }
+
+  const p = getParams();
+  log(`Detectando (conf=${p.conf}, imgsz=${p.imgsz})...`, 'info');
+
+  const img = new Image();
+  img.src = currentImg;
+  await img.decode();
+
+  const vw = img.naturalWidth, vh = img.naturalHeight;
+
+  // Preprocess
+  const { tensor, transform } = preprocess(img, p.imgsz);
+  const results = await session.run({ [session.inputNames[0]]: tensor });
+  const output = results[session.outputNames[0]];
+  const raw = decode(output.data, output.dims, p.imgsz);
+  const nmsBoxes = nms(raw, p.iou);
+  const high = nmsBoxes.filter(b => b.score >= p.conf);
+  let yoloBoxes = high.map(b => toOriginal(b, transform)).filter(b => (b.x2-b.x1) >= 30 && (b.y2-b.y1) >= 10 && (b.x2-b.x1)/(b.y2-b.y1+1) < 12);
+
+  let fallbackBox = null;
+  if (yoloBoxes.length === 0) {
+    fallbackBox = detectFallback(img, p);
+    if (fallbackBox && fallbackBox.score) {
+      log(`Fallback: ${(fallbackBox.score*100).toFixed(1)}%`, 'info');
+    }
+  }
+
+  const maxConf = raw.length ? Math.max(...raw.map(b => b.score)) : 0;
+  document.getElementById('stat-preds').textContent = raw.length;
+  document.getElementById('stat-high').textContent = high.length;
+  document.getElementById('stat-maxconf').textContent = (maxConf*100).toFixed(1) + '%';
+  document.getElementById('stat-fb').textContent = fallbackBox ? (fallbackBox.score*100).toFixed(1) + '%' : '--';
+
+  // Draw on overlay
+  drawBoxes(yoloBoxes, fallbackBox, vw, vh);
+
+  log(`YOLO: ${raw.length} predicciones, ${high.length} high, max ${(maxConf*100).toFixed(1)}%`, 'ok');
+  if (yoloBoxes.length > 0) log(`✅ Placa detectada por YOLO`, 'ok');
+  else if (fallbackBox) log(`⚠ Placa detectada por fallback`, 'warn');
+  else log('❌ Sin detecci&oacute;n', 'err');
+}
+
+function preprocess(img, isz) {
+  const vw = img.naturalWidth, vh = img.naturalHeight;
   const maxSize = Math.max(vw, vh);
   const scale = isz / maxSize;
   const ox = (isz - vw * scale) / 2, oy = (isz - vh * scale) / 2;
@@ -116,7 +183,7 @@ function preprocess(video, isz) {
   c.width = isz; c.height = isz;
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, isz, isz);
-  ctx.drawImage(video, ox, oy, vw * scale, vh * scale);
+  ctx.drawImage(img, ox, oy, vw * scale, vh * scale);
   const rgba = ctx.getImageData(0, 0, isz, isz).data;
   const ch = isz * isz;
   const data = new Float32Array(3 * ch);
@@ -168,13 +235,13 @@ function nms(dets, thresh) {
   return result;
 }
 
-function detectFallback(video, params) {
-  const vw = video.videoWidth, vh = video.videoHeight;
+function detectFallback(img, params) {
+  const vw = img.naturalWidth, vh = img.naturalHeight;
   if (vw < 50 || vh < 50) return null;
   const c = document.createElement('canvas');
   c.width = vw; c.height = vh;
   const ctx = c.getContext('2d');
-  ctx.drawImage(video, 0, 0);
+  ctx.drawImage(img, 0, 0);
   const data = ctx.getImageData(0, 0, vw, vh).data;
   const gray = new Uint8Array(vw * vh);
   for (let i = 0; i < vw * vh; i++) gray[i] = (data[i<<2] * 0.299 + data[(i<<2)+1] * 0.587 + data[(i<<2)+2] * 0.114) | 0;
@@ -211,90 +278,39 @@ function detectFallback(video, params) {
   return { x1: xS, y1: yS, x2: xE, y2: yE, score: Math.min(0.7, score) };
 }
 
-async function start() {
-  stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720, facingMode: 'environment' } });
-  video.srcObject = stream; await video.play();
-  running = true;
-  document.getElementById('btn-start').disabled = true;
-  document.getElementById('btn-stop').disabled = false;
-  log('Iniciado', 'ok');
-  loop();
-}
-function stop() {
-  running = false;
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  video.srcObject = null;
-  document.getElementById('btn-start').disabled = false;
-  document.getElementById('btn-stop').disabled = true;
-  log('Detenido', 'warn');
-}
-document.getElementById('btn-start').addEventListener('click', start);
-document.getElementById('btn-stop').addEventListener('click', stop);
-
-async function loop() {
-  if (!running || !video.videoWidth) { requestAnimationFrame(loop); return; }
-  const p = getParams();
-  if (overlay.width !== video.videoWidth) { overlay.width = video.videoWidth; overlay.height = video.videoHeight; }
+function drawBoxes(yoloBoxes, fallbackBox, vw, vh) {
+  // Resize overlay to match displayed image size
+  const rect = imgEl.getBoundingClientRect();
+  const displayW = rect.width;
+  const displayH = rect.height;
+  overlay.width = displayW;
+  overlay.height = displayH;
+  const scaleX = displayW / vw;
+  const scaleY = displayH / vh;
 
   const ctx = overlay.getContext('2d');
   ctx.clearRect(0, 0, overlay.width, overlay.height);
 
-  let yoloBoxes = [], fallbackBox = null;
-
-  if (session) {
-    const { tensor, transform } = preprocess(video, p.imgsz);
-    const results = await session.run({ [session.inputNames[0]]: tensor });
-    const output = results[session.outputNames[0]];
-    const raw = decode(output.data, output.dims, p.imgsz);
-    const nmsBoxes = nms(raw, p.iou);
-    const high = nmsBoxes.filter(b => b.score >= p.conf);
-    yoloBoxes = high.map(b => toOriginal(b, transform)).filter(b => (b.x2-b.x1) >= 30 && (b.y2-b.y1) >= 10 && (b.x2-b.x1)/(b.y2-b.y1+1) < 12);
-
-    const maxConf = raw.length ? Math.max(...raw.map(b => b.score)) : 0;
-    document.getElementById('stat-preds').textContent = raw.length;
-    document.getElementById('stat-high').textContent = high.length;
-    document.getElementById('stat-maxconf').textContent = (maxConf*100).toFixed(1) + '%';
-  }
-
-  if (yoloBoxes.length === 0) {
-    fallbackBox = detectFallback(video, p);
-    document.getElementById('stat-fb').textContent = fallbackBox ? (fallbackBox.score*100).toFixed(1) + '%' : '--';
-  } else {
-    document.getElementById('stat-fb').textContent = '--';
-  }
-
-  // Draw YOLO boxes (yellow)
+  // YOLO boxes
   for (const b of yoloBoxes) {
+    const x = b.x1 * scaleX, y = b.y1 * scaleY;
+    const w = (b.x2 - b.x1) * scaleX, h = (b.y2 - b.y1) * scaleY;
     ctx.strokeStyle = '#ffcc00'; ctx.lineWidth = 2;
-    ctx.strokeRect(b.x1, b.y1, b.x2-b.x1, b.y2-b.y1);
-    ctx.fillStyle = '#ffcc00'; ctx.font = '11px monospace';
-    ctx.fillText((b.score*100).toFixed(0) + '%', b.x1, b.y1-3);
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = '#ffcc00'; ctx.font = 'bold 13px monospace';
+    ctx.fillText(`${(b.score*100).toFixed(0)}%`, x, y - 5);
   }
 
-  // Draw fallback (blue dashed)
+  // Fallback
   if (fallbackBox) {
-    ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
-    ctx.strokeRect(fallbackBox.x1, fallbackBox.y1, fallbackBox.x2-fallbackBox.x1, fallbackBox.y2-fallbackBox.y1);
+    const x = fallbackBox.x1 * scaleX, y = fallbackBox.y1 * scaleY;
+    const w = (fallbackBox.x2 - fallbackBox.x1) * scaleX, h = (fallbackBox.y2 - fallbackBox.y1) * scaleY;
+    ctx.strokeStyle = '#00aaff'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x, y, w, h);
     ctx.setLineDash([]);
-    ctx.fillStyle = '#00aaff'; ctx.font = '11px monospace';
-    ctx.fillText('F ' + (fallbackBox.score*100).toFixed(0) + '%', fallbackBox.x1, fallbackBox.y2 + 14);
+    ctx.fillStyle = '#00aaff'; ctx.font = 'bold 13px monospace';
+    ctx.fillText(`F ${(fallbackBox.score*100).toFixed(0)}%`, x, y + h + 16);
   }
-
-  // Center crosshair
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([4,6]);
-  const cx = overlay.width/2, cy = overlay.height/2;
-  ctx.beginPath(); ctx.moveTo(cx-30, cy); ctx.lineTo(cx+30, cy);
-  ctx.moveTo(cx, cy-30); ctx.lineTo(cx, cy+30); ctx.stroke(); ctx.setLineDash([]);
-
-  document.getElementById('config-preview').textContent = JSON.stringify(p);
-
-  frameCount++;
-  const now = performance.now();
-  if (now - lastFpsTime >= 1000) {
-    document.getElementById('fps').textContent = `FPS ${frameCount}`;
-    frameCount = 0; lastFpsTime = now;
-  }
-  requestAnimationFrame(loop);
 }
 </script>
 </body>

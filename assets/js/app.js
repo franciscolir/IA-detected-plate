@@ -23,7 +23,7 @@ let lastFpsTime = performance.now();
 let streakCandidate = null;
 let streakCount = 0;
 let streakRequired = 3;
-let noDetectLimit = 30;
+let noDetectLimit = 20;
 let lastPlateTime = 0;
 
 async function init() {
@@ -31,7 +31,7 @@ async function init() {
   const fpsCfg = await getConfig('fps', 30);
   const sensitivity = await getConfig('sensitivity', 0.15);
   streakRequired = await getConfig('streak', 3);
-  noDetectLimit = await getConfig('noDetect', 30);
+  noDetectLimit = await getConfig('noDetect', 20);
   const corrections = await getConfig('corrections', {
     letter: { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '6': 'G', '8': 'B' },
     number: { 'O': '0', 'Q': '0', 'D': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'B': '8', 'G': '6' }
@@ -163,14 +163,13 @@ async function loop() {
 
 function showPlate(plate) {
   if (!plateEl) return;
-  const formatted = formatPlate(plate);
   let letters = '', numbers = '';
-  if (/^[A-Z]{4}\d{2}$/.test(formatted)) {
-    letters = formatted.slice(0, 4);
-    numbers = formatted.slice(4);
-  } else if (/^[A-Z]{2}\d{4}$/.test(formatted)) {
-    letters = formatted.slice(0, 2);
-    numbers = formatted.slice(2);
+  if (/^[A-Z]{4}\d{2}$/.test(plate)) {
+    letters = plate.slice(0, 4);
+    numbers = plate.slice(4);
+  } else if (/^[A-Z]{2}\d{4}$/.test(plate)) {
+    letters = plate.slice(0, 2);
+    numbers = plate.slice(2);
   }
   plateEl.querySelector('.plate-letters').textContent = letters;
   plateEl.querySelector('.plate-numbers').textContent = numbers;

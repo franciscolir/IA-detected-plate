@@ -29,7 +29,7 @@
     </label>
   </div>
   <div class="small text-warning mb-2">
-    ⚠ Sub&iacute; una foto de auto donde se vea la placa. El detector busca la patente y la marca.
+    ⚠ Sube una foto de auto donde se vea la placa. El detector busca la patente y la marca.
   </div>
 
   <div class="row g-2">
@@ -38,6 +38,7 @@
         <img id="uploaded-img" class="w-100" style="display:none" />
         <canvas id="overlay"></canvas>
       </div>
+      <button id="btn-detect" class="btn btn-success btn-sm w-100 mt-1 mb-1">Detectar placa</button>
 
       <div class="stats-grid mt-1" id="stats-grid">
         <div class="stat">YOLO boxes <span class="val" id="stat-preds">--</span></div>
@@ -60,7 +61,6 @@
             <div class="mb-1"><label>Input size <span id="val-imgsz">640</span></label><input type="range" class="form-range" id="param-imgsz" min="320" max="640" step="32" value="640" /></div>
             <div class="mb-1"><label>Fallback edge <span id="val-edge">0.12</span></label><input type="range" class="form-range" id="param-edge" min="0.03" max="0.30" step="0.01" value="0.12" /></div>
             <div class="mb-1"><label>Fallback minH <span id="val-minh">4</span></label><input type="range" class="form-range" id="param-minh" min="2" max="20" step="1" value="4" /></div>
-            <button id="btn-detect" class="btn btn-success btn-sm mt-1 w-100">Detectar</button>
           </div>
         </div>
         <div class="tab-pane" id="tab-log"><div class="log-box" id="log-box">[Listo] Sub&iacute; una imagen y presion&aacute; Detectar</div></div>

@@ -50,6 +50,7 @@
     <!-- Right: selected image + OCR result -->
     <div class="col-12 col-lg-7">
       <div id="selected-view" class="text-center text-secondary small py-4">Sub&iacute; una imagen recortada de placa para analizar</div>
+      <button id="btn-detect-ocr" class="btn btn-success btn-sm w-100 mt-1">Detectar caracteres</button>
 
       <!-- OCR controls -->
       <div class="row g-1 mt-1 controls small">
@@ -119,7 +120,6 @@ fileInput.addEventListener('change', () => {
       images.push({ id, dataUrl: e.target.result, file, result: null });
       renderList();
       selectImage(id);
-      processImage(id);
     };
     reader.readAsDataURL(file);
   }
@@ -132,6 +132,12 @@ document.getElementById('btn-clear').addEventListener('click', () => {
   selectedView.innerHTML = '<div class="text-center text-secondary small py-4">Seleccion&aacute; una imagen o sub&iacute; una nueva</div>';
   resultArea.innerHTML = '';
   logBox.innerHTML = '<div>[Log limpiado]</div>';
+});
+
+document.getElementById('btn-detect-ocr').addEventListener('click', () => {
+  if (!selectedId) { log('Primero sub&iacute; una imagen', 'warn'); return; }
+  images.forEach(img => { img.result = null; });
+  images.forEach(img => processImage(img.id));
 });
 
 // ─── Image list ─────────────────────────────────

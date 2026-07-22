@@ -6,6 +6,11 @@ export class PlateDetector {
     this.inputSize = options.inputSize || 640;
     this.confThreshold = options.confThreshold || 0.5;
     this.iouThreshold = options.iouThreshold || 0.45;
+    this.fbEdge = options.fbEdge ?? 0.12;
+    this.fbRowFactor = options.fbRowFactor ?? 0.15;
+    this.fbColFactor = options.fbColFactor ?? 0.18;
+    this.fbMinHeight = options.fbMinHeight ?? 4;
+    this.fbSizeLimit = options.fbSizeLimit ?? 0.95;
     this.mock = true;
     this._transform = null;
     this._smoothBox = null;
@@ -279,7 +284,7 @@ export class PlateDetector {
     }
     if (maxGrad < 5) return null;
 
-    const edgeThresh = maxGrad * 0.12;
+    const edgeThresh = maxGrad * this.fbEdge;
 
     // Row edge density
     const rowCount = new Uint16Array(vh);
@@ -293,7 +298,7 @@ export class PlateDetector {
     for (let y = 0; y < vh; y++) { if (rowCount[y] > maxR) maxR = rowCount[y]; }
     if (maxR < 3) return null;
 
-    const rowMin = Math.max(3, maxR * 0.15);
+    const rowMin = Math.max(3, maxR * this.fbRowFactor);
     let yS = -1, yE = -1;
     for (let y = 0; y < vh; y++) {
       if (rowCount[y] > rowMin) { if (yS === -1) yS = y; yE = y; }
@@ -302,7 +307,6 @@ export class PlateDetector {
 
     yS = Math.max(0, yS - 3);
     yE = Math.min(vh, yE + 3);
-    const bandH = yE - yS;
 
     // Column edge density within band
     const colCount = new Uint16Array(vw);
@@ -316,7 +320,7 @@ export class PlateDetector {
     for (let x = 0; x < vw; x++) { if (colCount[x] > maxC) maxC = colCount[x]; }
     if (maxC < 3) return null;
 
-    const colMin = Math.max(3, maxC * 0.18);
+    const colMin = Math.max(3, maxC * this.fbColFactor);
     let xS = -1, xE = -1;
     for (let x = 0; x < vw; x++) {
       if (colCount[x] > colMin) { if (xS === -1) xS = x; xE = x; }
@@ -328,8 +332,8 @@ export class PlateDetector {
 
     const pw = xE - xS;
     const ph = yE - yS;
-    if (pw < 10 || ph < 3) return null;
-    if (pw > vw * 0.95 || ph > vh * 0.95) return null;
+    if (pw < 10 || ph < this.fbMinHeight) return null;
+    if (pw > vw * this.fbSizeLimit || ph > vh * this.fbSizeLimit) return null;
 
     const aspect = pw / ph;
     const aspectScore = Math.max(0, 1 - Math.abs(aspect - 3.5) / 5);

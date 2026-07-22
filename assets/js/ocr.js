@@ -31,7 +31,7 @@ export class PlateOCR {
 
     const { data, shape } = this._preprocess(imageData);
     const ortTensor = new ort.Tensor('float32', data, shape);
-    const results = await this.session.run({ x: ortTensor });
+    const results = await this.session.run({ [this.session.inputNames[0]]: ortTensor });
     const output = results[this.session.outputNames[0]];
     return this._ctcGreedyDecode(output.data, output.dims);
   }

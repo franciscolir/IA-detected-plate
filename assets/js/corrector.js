@@ -47,22 +47,18 @@ export class Corrector {
   correct(text) {
     const clean = text.replace(/[\s-]/g, '').toUpperCase();
     const zones = this._detectZones(clean);
-    if (!zones) {
-      return this._safeFallback(clean);
+    if (zones) {
+      return clean.split('').map((c, i) => {
+        if (i >= zones.letterRange[0] && i <= zones.letterRange[1]) {
+          return this.letterCorrections[c] || c;
+        }
+        if (i >= zones.numberRange[0] && i <= zones.numberRange[1]) {
+          return this.numberCorrections[c] || c;
+        }
+        return c;
+      }).join('');
     }
-    return clean.split('').map((c, i) => {
-      if (i >= zones.letterRange[0] && i <= zones.letterRange[1]) {
-        return this.letterCorrections[c] || c;
-      }
-      if (i >= zones.numberRange[0] && i <= zones.numberRange[1]) {
-        return this.numberCorrections[c] || c;
-      }
-      return c;
-    }).join('');
-  }
-
-  _safeFallback(text) {
-    return this.letterCorrections[text] || this.numberCorrections[text] || text;
+    return clean.split('').map(c => this.letterCorrections[c] || this.numberCorrections[c] || c).join('');
   }
 
   setCorrections(corrections) {

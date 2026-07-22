@@ -1,0 +1,84 @@
+:root { --bg: #0b0f14; --surface: #131a23; --accent: #00d26a; --text: #e6edf3; }
+body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
+.app-shell { max-width: 900px; margin: 0 auto; }
+.video-box { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; border-radius: 8px; }
+#video { width: 100%; height: 100%; object-fit: cover; }
+#overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+/* Chilean license plate - official design */
+#plate-display {
+  width: min(340px, calc(100vw - 32px)); height: auto;
+  aspect-ratio: 2.8 / 1; margin: 0.8rem auto;
+  position: relative; cursor: default;
+}
+#plate-display .plate-inner {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 30%, #f5f5f5 50%, #f8f8f8 70%, #ffffff 100%);
+  border: 4px solid #1f1f1f; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Arial Black', 'Helvetica Neue Bold', 'Arial', sans-serif;
+  font-weight: 900;
+  font-size: clamp(1.8rem, 8vw, 3rem);
+  color: #111111;
+  letter-spacing: clamp(4px, 2vw, 8px);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(255,255,255,0.15);
+  position: relative; overflow: hidden;
+}
+@media (max-width: 400px) {
+  #plate-display .plate-inner { border-width: 3px; border-radius: 7px; }
+  #plate-display .plate-dot { width: 4px; height: 4px; }
+}
+/* Diagonal gloss overlay */
+#plate-display .plate-inner::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 25%, transparent 40%);
+  pointer-events: none;
+}
+/* Inner shadow/emboss */
+#plate-display .plate-inner::after {
+  content: ''; position: absolute; inset: 2px;
+  border-radius: 8px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+  pointer-events: none;
+}
+#plate-display .plate-content {
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; position: relative; z-index: 1;
+}
+#plate-display .plate-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #111111; vertical-align: middle;
+  display: inline-block; margin: 0 2px;
+  opacity: 0.2;
+}
+#plate-display .plate-letters, #plate-display .plate-numbers {
+  display: inline-block;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.1);
+  opacity: 0.2;
+}
+#plate-display.detected .plate-letters,
+#plate-display.detected .plate-numbers,
+#plate-display.detected .plate-dot { opacity: 1; }
+#plate-display .plate-numbers { margin-left: 2px; }
+#plate-display.detected .plate-inner {
+  box-shadow: 0 0 20px var(--accent), 0 3px 12px rgba(0,0,0,0.15);
+}
+
+.hud { background: rgba(0,0,0,0.5); padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 4px; }
+.hud .badge { font-size: 0.65rem; }
+.settings-section label { font-size: 0.75rem; }
+.test-links a { font-size: 0.8rem; }
+#status { min-height: 1.2em; font-size: 0.8rem; }
+
+/* Loading overlay */
+#loading-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease;
+}
+#loading-overlay.hidden { opacity: 0; pointer-events: none; }
+.spinner { width: 48px; height: 48px; border: 4px solid #333; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#loading-text { margin-top: 1rem; font-size: 0.9rem; color: var(--accent); }
+#loading-detail { font-size: 0.75rem; color: #888; margin-top: 0.3rem; }

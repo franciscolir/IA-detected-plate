@@ -8,3 +8,4 @@ training/*.zip
 training/dataset/
 assets/models/saved_model_tf/
 assets/models/best.onnx
+backup_js/

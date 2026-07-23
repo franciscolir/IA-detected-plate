@@ -96,19 +96,7 @@ async function start() {
   clearPlate();
 
   ensureDebugOverlay();
-  checkOrientation();
   loop();
-}
-
-function checkOrientation() {
-  const video = camera.getVideo();
-  if (!video) return;
-  const vw = video.videoWidth, vh = video.videoHeight;
-  const isPortrait = vh > vw;
-  const el = document.getElementById('orientation-hint');
-  if (el) {
-    el.style.display = isPortrait ? 'block' : 'none';
-  }
 }
 
 function stop() {
@@ -253,11 +241,6 @@ function ensureDebugOverlay() {
   el.style.cssText = 'position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.75);color:#0f0;font:10px/1.5 monospace;padding:4px 6px;border-radius:3px;z-index:20;pointer-events:none;white-space:pre;max-width:50%';
   document.querySelector('.video-box')?.appendChild(el);
 
-  const hint = document.createElement('div');
-  hint.id = 'orientation-hint';
-  hint.style.cssText = 'position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,50,50,0.85);color:#fff;font:bold 13px sans-serif;padding:6px 14px;border-radius:6px;z-index:20;pointer-events:none;display:none;text-align:center';
-  hint.textContent = 'Gira el teléfono a horizontal (landscape)';
-  document.querySelector('.video-box')?.appendChild(hint);
 }
 
 function updateDebugOverlay(video) {

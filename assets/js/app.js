@@ -51,6 +51,9 @@ async function init() {
   setLoading('Modelos listos', '');
   setTimeout(hideLoading, 500);
 
+  updateSysInfo();
+  setInterval(updateSysInfo, 2000);
+
   if (!detLoaded && !ocrLoaded) setStatus('Modo demo - coloca los .onnx en assets/models/');
   else setStatus('Listo. Presiona Iniciar');
 
@@ -241,6 +244,54 @@ function ensureDebugOverlay() {
   el.style.cssText = 'position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.75);color:#0f0;font:10px/1.5 monospace;padding:4px 6px;border-radius:3px;z-index:20;pointer-events:none;white-space:pre;max-width:50%';
   document.querySelector('.video-box')?.appendChild(el);
 
+}
+
+function updateSysInfo() {
+  const det = detector || { mock: true, _lastRawPreds: 0, _lastMaxConf: 0, _lastFallback: false };
+  const ocrMock = ocr ? ocr.mock : true;
+  const detStatus = det.mock ? '◌ MOCK' : '✓ OK';
+  const ocrStatus = ocrMock ? '◌ MOCK' : '✓ OK';
+  const appHtml =
+    `<span class="label">Detector:</span> <span class="val">${detStatus}</span>\n` +
+    `<span class="label">OCR:</span> <span class="val">${ocrStatus}</span>\n` +
+    `<span class="label">Preds:</span> <span class="val">${det._lastRawPreds || 0}</span>\n` +
+    `<span class="label">Max conf:</span> <span class="val">${((det._lastMaxConf || 0) * 100).toFixed(1)}%</span>\n` +
+    `<span class="label">OCR raw:</span> <span class="val">"${lastRawText}"</span>\n` +
+    `<span class="label">Placa:</span> <span class="val">"${lastCorrected}"</span>\n` +
+    `<span class="label">Streak:</span> <span class="val">${streakCount}/${streakRequired} ${lastOCRValid ? '🟢' : '⚪'}</span>\n` +
+    `<span class="label">FPS:</span> <span class="val">${frameCount}</span>`;
+  document.getElementById('sys-app').innerHTML = appHtml;
+
+  // Device info (collected once)
+  const mem = navigator.deviceMemory !== undefined ? navigator.deviceMemory + ' GB' : 'N/D';
+  const cpu = navigator.hardwareConcurrency || 'N/D';
+  let gpu = 'N/D';
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+    if (gl) gpu = gl.getParameter(gl.RENDERER);
+  } catch (_) {}
+  const deviceHtml =
+    `<span class="label">RAM:</span> <span class="val">${mem}</span>\n` +
+    `<span class="label">CPU cores:</span> <span class="val">${cpu}</span>\n` +
+    `<span class="label">GPU:</span> <span class="val">${gpu}</span>\n` +
+    `<span class="label">Plataforma:</span> <span class="val">${navigator.platform || 'N/D'}</span>`;
+  document.getElementById('sys-device').innerHTML = deviceHtml;
+
+  // Browser info
+  const ua = navigator.userAgent;
+  const shortUA = ua.length > 80 ? ua.slice(0, 80) + '...' : ua;
+  const webglOk = (() => { try { return !!document.createElement('canvas').getContext('webgl'); } catch(_) { return false; } })();
+  const webgpuOk = !!navigator.gpu;
+  const wasmOk = typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function';
+  const browserHtml =
+    `<span class="label">UA:</span> <span class="val">${shortUA}</span>\n` +
+    `<span class="label">WebGL:</span> <span class="val">${webglOk ? '✓' : '✗'}</span>\n` +
+    `<span class="label">WebGPU:</span> <span class="val">${webgpuOk ? '✓' : '✗'}</span>\n` +
+    `<span class="label">WASM:</span> <span class="val">${wasmOk ? '✓' : '✗'}</span>\n` +
+    `<span class="label">Screen:</span> <span class="val">${screen.width}x${screen.height}</span>\n` +
+    `<span class="label">DPR:</span> <span class="val">${window.devicePixelRatio || 1}</span>`;
+  document.getElementById('sys-browser').innerHTML = browserHtml;
 }
 
 function updateDebugOverlay(video) {

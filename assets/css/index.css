@@ -82,3 +82,8 @@ body { background: var(--bg); color: var(--text); font-family: system-ui, -apple
 @keyframes spin { to { transform: rotate(360deg); } }
 #loading-text { margin-top: 1rem; font-size: 0.9rem; color: var(--accent); }
 #loading-detail { font-size: 0.75rem; color: #888; margin-top: 0.3rem; }
+
+/* Sys info table */
+#sys-app, #sys-device, #sys-browser { vertical-align: top; }
+#sys-app .label, #sys-device .label, #sys-browser .label { color: #888; }
+#sys-app .val, #sys-device .val, #sys-browser .val { color: #e6edf3; }

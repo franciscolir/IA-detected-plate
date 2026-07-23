@@ -32,10 +32,19 @@
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
       </div>
       <div class="offcanvas-body p-2">
-        <div class="list-group">
-          <a href="test_camera.html" class="list-group-item list-group-item-action bg-dark text-white border-secondary">&#x1F4F7; Test C&aacute;mara</a>
-          <a href="test_ocr.html" class="list-group-item list-group-item-action bg-dark text-white border-secondary">&#x1F524; Test OCR</a>
-          <a href="test_detector.html" class="list-group-item list-group-item-action bg-dark text-white border-secondary">&#x1F3AF; Test Detector</a>
+        <div class="list-group list-group-flush">
+          <a href="test_camera.html" class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex align-items-center gap-2 py-2">
+            <span style="width:2em;text-align:center;font-weight:700;color:var(--accent)">1</span>
+            <span><strong>Test C&aacute;mara</strong><br><small class="text-secondary">Pipeline completo con par&aacute;metros ajustables</small></span>
+          </a>
+          <a href="test_ocr.html" class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex align-items-center gap-2 py-2">
+            <span style="width:2em;text-align:center;font-weight:700;color:var(--accent)">2</span>
+            <span><strong>Test OCR</strong><br><small class="text-secondary">Reconocimiento de caracteres en placas recortadas</small></span>
+          </a>
+          <a href="test_detector.html" class="list-group-item list-group-item-action bg-transparent text-white border-secondary d-flex align-items-center gap-2 py-2">
+            <span style="width:2em;text-align:center;font-weight:700;color:var(--accent)">3</span>
+            <span><strong>Test Detector</strong><br><small class="text-secondary">YOLO + fallback por proyecci&oacute;n</small></span>
+          </a>
         </div>
       </div>
     </div>

@@ -22,7 +22,7 @@ let frameCount = 0;
 let lastFpsTime = performance.now();
 let streakCandidate = null;
 let streakCount = 0;
-let streakRequired = 3;
+let streakRequired = 2;
 let noDetectLimit = 20;
 let lastRawText = '';
 let lastCorrected = '';
@@ -31,7 +31,7 @@ let lastOCRValid = false;
 async function init() {
   const resolution = await getConfig('resolution', '1280x720');
   const sensitivity = await getConfig('sensitivity', 0.15);
-  streakRequired = await getConfig('streak', 3);
+  streakRequired = await getConfig('streak', 2);
   noDetectLimit = await getConfig('noDetect', 20);
   const corrections = await getConfig('corrections', {
     letter: { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '6': 'G', '8': 'B' },

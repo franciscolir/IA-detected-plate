@@ -18,8 +18,26 @@
   <main class="app-shell p-2">
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-2">
-      <span class="small text-secondary">IA Detected Plate</span>
+      <div>
+        <button class="btn btn-sm btn-outline-secondary me-2 px-2" data-bs-toggle="offcanvas" data-bs-target="#menu-offcanvas" style="line-height:1">&#9776;</button>
+        <span class="small text-secondary">IA Detected Plate</span>
+      </div>
       <span id="fps" class="hud small text-secondary">FPS --</span>
+    </div>
+
+    <!-- Offcanvas menu -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="menu-offcanvas" data-bs-theme="dark">
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title">Men&uacute;</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+      </div>
+      <div class="offcanvas-body p-2">
+        <div class="list-group">
+          <a href="test_camera.html" class="list-group-item list-group-item-action bg-dark text-white border-secondary">&#x1F4F7; Test C&aacute;mara</a>
+          <a href="test_ocr.html" class="list-group-item list-group-item-action bg-dark text-white border-secondary">&#x1F524; Test OCR</a>
+          <a href="test_detector.html" class="list-group-item list-group-item-action bg-dark text-white border-secondary">&#x1F3AF; Test Detector</a>
+        </div>
+      </div>
     </div>
 
     <!-- Camera + sys panel overlay -->
@@ -62,35 +80,10 @@
     </div>
     <div id="status" class="text-center text-secondary small mb-2">Listo.</div>
 
-    <!-- Settings -->
-    <details class="mb-2 small settings-section">
-      <summary class="text-secondary" style="cursor:pointer">Ajustes</summary>
-      <div class="p-2 bg-dark rounded mt-1">
-        <div class="mb-2">
-          <label>Sensibilidad <span id="cfg-sensitivity-val">0.15</span></label>
-          <input type="range" id="cfg-sensitivity" class="form-range" min="0.05" max="0.50" step="0.05" value="0.15" />
-        </div>
-        <div class="mb-2">
-          <label>Streak <span id="cfg-streak-val">2</span></label>
-          <input type="range" id="cfg-streak" class="form-range" min="1" max="10" step="1" value="2" />
-        </div>
-        <div class="mb-2">
-          <label>No-detect frames <span id="cfg-nodetect-val">20</span></label>
-          <input type="range" id="cfg-nodetect" class="form-range" min="5" max="60" step="1" value="20" />
-        </div>
-      </div>
-    </details>
 
-
-
-    <!-- Test links -->
-    <div class="text-center test-links mt-3">
-      <a href="test_camera.html" class="text-info small me-3">Test C&aacute;mara</a>
-      <a href="test_ocr.html" class="text-info small me-3">Test OCR</a>
-      <a href="test_detector.html" class="text-info small">Test Detector</a>
-    </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script type="importmap">{"imports":{"onnxruntime-web":"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.mjs"}}</script>
   <script type="module" src="assets/js/app.js"></script>
 </body>

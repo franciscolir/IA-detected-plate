@@ -63,24 +63,6 @@ async function init() {
 function setupEvents() {
   document.getElementById('btn-start').addEventListener('click', start);
   document.getElementById('btn-stop').addEventListener('click', stop);
-  document.getElementById('cfg-sensitivity').addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value);
-    document.getElementById('cfg-sensitivity-val').textContent = val.toFixed(2);
-    setConfig('sensitivity', val);
-    if (detector) detector.confThreshold = val;
-  });
-  document.getElementById('cfg-streak').addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    document.getElementById('cfg-streak-val').textContent = val;
-    streakRequired = val;
-    setConfig('streak', val);
-  });
-  document.getElementById('cfg-nodetect').addEventListener('input', (e) => {
-    const val = parseInt(e.target.value);
-    document.getElementById('cfg-nodetect-val').textContent = val;
-    noDetectLimit = val;
-    setConfig('noDetect', val);
-  });
 }
 
 async function start() {

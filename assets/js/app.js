@@ -91,7 +91,21 @@ async function start() {
   document.getElementById('btn-start').disabled = true;
   document.getElementById('btn-stop').disabled = false;
   clearPlate();
+
+  ensureDebugOverlay();
+  checkOrientation();
   loop();
+}
+
+function checkOrientation() {
+  const video = camera.getVideo();
+  if (!video) return;
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const isPortrait = vh > vw;
+  const el = document.getElementById('orientation-hint');
+  if (el) {
+    el.style.display = isPortrait ? 'block' : 'none';
+  }
 }
 
 function stop() {
@@ -108,6 +122,7 @@ async function loop() {
   if (!video || !video.videoWidth) { requestAnimationFrame(loop); return; }
 
   resizeOverlay();
+  updateDebugOverlay(video);
 
   const boxes = await detector.detect(video, overlayEl);
 
@@ -221,6 +236,35 @@ function resizeOverlay() {
       overlayEl.height = video.videoHeight;
     }
   }
+}
+
+function ensureDebugOverlay() {
+  if (document.getElementById('debug-info')) return;
+  const el = document.createElement('div');
+  el.id = 'debug-info';
+  el.style.cssText = 'position:absolute;top:4px;left:4px;background:rgba(0,0,0,0.75);color:#0f0;font:10px/1.5 monospace;padding:4px 6px;border-radius:3px;z-index:20;pointer-events:none;white-space:pre;max-width:50%';
+  document.querySelector('.video-box')?.appendChild(el);
+
+  const hint = document.createElement('div');
+  hint.id = 'orientation-hint';
+  hint.style.cssText = 'position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(255,50,50,0.85);color:#fff;font:bold 13px sans-serif;padding:6px 14px;border-radius:6px;z-index:20;pointer-events:none;display:none;text-align:center';
+  hint.textContent = 'Gira el teléfono a horizontal (landscape)';
+  document.querySelector('.video-box')?.appendChild(hint);
+}
+
+function updateDebugOverlay(video) {
+  const el = document.getElementById('debug-info');
+  if (!el) return;
+  const vw = video.videoWidth || 0, vh = video.videoHeight || 0;
+  const det = detector || { mock: true, _lastRawPreds: 0, _lastMaxConf: 0, _lastFallback: false };
+  const ocrMock = ocr ? ocr.mock : true;
+  el.textContent =
+    `📷 ${vw}x${vh}` +
+    `\n🎯 detector: ${det.mock ? 'MOCK' : 'OK'}` +
+    `\n🔤 ocr: ${ocrMock ? 'MOCK' : 'OK'}` +
+    `\n📦 raw: ${det._lastRawPreds || 0}` +
+    `\n📈 max: ${((det._lastMaxConf || 0) * 100).toFixed(1)}%` +
+    (det._lastFallback ? `\n🔵 fallback: si` : '');
 }
 
 function setStatus(msg) {

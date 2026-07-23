@@ -6,9 +6,9 @@ export class PlateDetector {
     this.inputSize = options.inputSize || 640;
     this.confThreshold = options.confThreshold || 0.5;
     this.iouThreshold = options.iouThreshold || 0.45;
-    this.fbEdge = options.fbEdge ?? 0.12;
-    this.fbRowFactor = options.fbRowFactor ?? 0.15;
-    this.fbColFactor = options.fbColFactor ?? 0.18;
+    this.fbEdge = options.fbEdge ?? 0.08;
+    this.fbRowFactor = options.fbRowFactor ?? 0.10;
+    this.fbColFactor = options.fbColFactor ?? 0.12;
     this.fbMinHeight = options.fbMinHeight ?? 4;
     this.fbSizeLimit = options.fbSizeLimit ?? 0.95;
     this.mock = true;
@@ -20,7 +20,7 @@ export class PlateDetector {
   async loadModel(modelPath) {
     try {
       this.session = await ort.InferenceSession.create(modelPath, {
-        executionProviders: ['webgpu', 'webgl', 'wasm'],
+        executionProviders: ['webgl', 'wasm'],
       });
       this.mock = false;
     } catch (e) {
@@ -51,11 +51,12 @@ export class PlateDetector {
       return w >= 30 && h >= 10 && w / h < 12;
     });
 
+    this._lastRawPreds = rawBoxes.length;
+    this._lastMaxConf = rawBoxes.length ? Math.max(...rawBoxes.map(b => b.score)) : 0;
+    this._lastFallback = mapped.length > 0 && rawBoxes.filter(b => b.score >= this.confThreshold).length === 0;
     if (this._debug) {
-      const confs = rawBoxes.map(b => b.score);
-      const maxConf = confs.length ? Math.max(...confs) : 0;
-      const over03 = confs.filter(c => c >= 0.3).length;
-      console.log(`[Detector] preds=${rawBoxes.length} nms=${nmsBoxes.length} high=${highConf.length} maxConf=${(maxConf*100).toFixed(1)}% over0.3=${over03}`);
+      const over03 = rawBoxes.filter(c => c.score >= 0.3).length;
+      console.log(`[Detector] preds=${rawBoxes.length} nms=${nmsBoxes.length} high=${highConf.length} maxConf=${(this._lastMaxConf*100).toFixed(1)}% over0.3=${over03}`);
     }
 
     // Fallback + anti-parpadeo

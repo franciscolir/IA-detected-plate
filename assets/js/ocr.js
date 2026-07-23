@@ -12,7 +12,7 @@ export class PlateOCR {
     try {
       const [session, chars] = await Promise.all([
         ort.InferenceSession.create(modelPath, {
-          executionProviders: ['webgpu', 'webgl', 'wasm'],
+          executionProviders: ['webgl', 'wasm'],
         }),
         fetch('assets/models/ppocr_keys.json').then(r => r.json()),
       ]);

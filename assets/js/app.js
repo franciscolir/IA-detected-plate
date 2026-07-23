@@ -24,6 +24,9 @@ let streakCandidate = null;
 let streakCount = 0;
 let streakRequired = 3;
 let noDetectLimit = 20;
+let lastRawText = '';
+let lastCorrected = '';
+let lastOCRValid = false;
 
 async function init() {
   const resolution = await getConfig('resolution', '1280x720');
@@ -137,11 +140,14 @@ async function loop() {
     const crop = detector.cropPlate(video, box);
     if (crop) {
       const rawText = await ocr.recognize(crop);
+      lastRawText = rawText || '(vacio)';
       if (rawText) {
         const normalized = normalizePlate(rawText);
         const corrected = corrector.correct(normalized);
+        lastCorrected = corrected || '(vacio)';
+        lastOCRValid = validatePlate(corrected) && corrected.length === 6;
 
-        if (validatePlate(corrected) && corrected.length === 6) {
+        if (lastOCRValid) {
           if (corrected === streakCandidate) streakCount++;
           else { streakCandidate = corrected; streakCount = 1; }
 
@@ -155,6 +161,8 @@ async function loop() {
           streakCandidate = null; streakCount = 0;
         }
       } else {
+        lastCorrected = '(vacio)';
+        lastOCRValid = false;
         streakCandidate = null; streakCount = 0;
       }
     }
@@ -264,7 +272,10 @@ function updateDebugOverlay(video) {
     `\n🔤 ocr: ${ocrMock ? 'MOCK' : 'OK'}` +
     `\n📦 raw: ${det._lastRawPreds || 0}` +
     `\n📈 max: ${((det._lastMaxConf || 0) * 100).toFixed(1)}%` +
-    (det._lastFallback ? `\n🔵 fallback: si` : '');
+    (det._lastFallback ? `\n🔵 fallback: si` : '') +
+    `\n\n📝 "${lastRawText}"` +
+    `\n✅ "${lastCorrected}"` +
+    `\n${lastOCRValid ? '🟢 valida' : '🔴 invalida'}  streak ${streakCount}/${streakRequired}`;
 }
 
 function setStatus(msg) {

@@ -22,10 +22,26 @@
       <span id="fps" class="hud small text-secondary">FPS --</span>
     </div>
 
-    <!-- Camera -->
-    <div class="video-box">
-      <video id="video" autoplay playsinline muted></video>
-      <canvas id="overlay" class="overlay"></canvas>
+    <!-- Camera + sys panel overlay -->
+    <div class="camera-wrapper">
+      <div class="video-box" id="video-box">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay" class="overlay"></canvas>
+      </div>
+      <div id="sys-panel">
+        <div class="sys-card" id="sys-app-card">
+          <div class="sys-card-title">App / Modelos</div>
+          <div class="sys-card-body" id="sys-app">cargando...</div>
+        </div>
+        <div class="sys-card" id="sys-device-card">
+          <div class="sys-card-title">Dispositivo</div>
+          <div class="sys-card-body" id="sys-device">cargando...</div>
+        </div>
+        <div class="sys-card" id="sys-browser-card">
+          <div class="sys-card-title">Navegador</div>
+          <div class="sys-card-body" id="sys-browser">cargando...</div>
+        </div>
+      </div>
     </div>
 
     <!-- CSS Chilean plate -->
@@ -65,20 +81,7 @@
       </div>
     </details>
 
-    <!-- System diagnostics -->
-    <details class="mb-2 small">
-      <summary class="text-secondary" style="cursor:pointer">Diagn&oacute;stico del sistema</summary>
-      <div class="p-1 bg-dark rounded mt-1" style="overflow-x:auto">
-        <table class="table table-dark table-bordered table-sm mb-0" style="font-size:0.65rem;white-space:pre-wrap;word-break:break-all">
-          <thead><tr><th>App / Modelos</th><th>Dispositivo</th><th>Navegador</th></tr></thead>
-          <tbody><tr>
-            <td id="sys-app"><span class="text-secondary">cargando...</span></td>
-            <td id="sys-device"><span class="text-secondary">cargando...</span></td>
-            <td id="sys-browser"><span class="text-secondary">cargando...</span></td>
-          </tr></tbody>
-        </table>
-      </div>
-    </details>
+
 
     <!-- Test links -->
     <div class="text-center test-links mt-3">

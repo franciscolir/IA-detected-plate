@@ -1,4 +1,4 @@
-:root { --bg: #0b0f14; --surface: #131a23; --accent: #00d26a; --text: #e6edf3; }
+:root { --bg: #0b0f14; --surface: #131a23; --accent: #00d26a; --text: #e6edf3; --card-bg: rgba(11,15,20,0.75); }
 body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
 .app-shell { max-width: 900px; margin: 0 auto; }
 .video-box { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; overflow: hidden; border-radius: 8px; }
@@ -28,13 +28,11 @@ body { background: var(--bg); color: var(--text); font-family: system-ui, -apple
   #plate-display .plate-inner { border-width: 3px; border-radius: 7px; }
   #plate-display .plate-dot { width: 4px; height: 4px; }
 }
-/* Diagonal gloss overlay */
 #plate-display .plate-inner::before {
   content: ''; position: absolute; inset: 0;
   background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 25%, transparent 40%);
   pointer-events: none;
 }
-/* Inner shadow/emboss */
 #plate-display .plate-inner::after {
   content: ''; position: absolute; inset: 2px;
   border-radius: 8px;
@@ -65,7 +63,6 @@ body { background: var(--bg); color: var(--text); font-family: system-ui, -apple
 }
 
 .hud { background: rgba(0,0,0,0.5); padding: 0.3rem 0.6rem; font-size: 0.8rem; border-radius: 4px; }
-.hud .badge { font-size: 0.65rem; }
 .settings-section label { font-size: 0.75rem; }
 .test-links a { font-size: 0.8rem; }
 #status { min-height: 1.2em; font-size: 0.8rem; }
@@ -83,7 +80,43 @@ body { background: var(--bg); color: var(--text); font-family: system-ui, -apple
 #loading-text { margin-top: 1rem; font-size: 0.9rem; color: var(--accent); }
 #loading-detail { font-size: 0.75rem; color: #888; margin-top: 0.3rem; }
 
-/* Sys info table */
-#sys-app, #sys-device, #sys-browser { vertical-align: top; }
-#sys-app .label, #sys-device .label, #sys-browser .label { color: #888; }
-#sys-app .val, #sys-device .val, #sys-browser .val { color: #e6edf3; }
+/* ─── Sys panel ──────────────────────────────────── */
+.camera-wrapper { position: relative; }
+
+/* Mobile: panel below video, 3 cols */
+#sys-panel {
+  display: flex; gap: 4px; margin-top: 4px;
+}
+.sys-card {
+  flex: 1; min-width: 0;
+  background: var(--card-bg);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; padding: 4px 6px;
+  backdrop-filter: blur(4px);
+}
+.sys-card-title {
+  font-size: 0.6rem; font-weight: 700; text-transform: uppercase;
+  color: var(--accent); letter-spacing: 0.05em; margin-bottom: 2px;
+}
+.sys-card-body {
+  font-size: 0.6rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+}
+.sys-card-body .label { color: #888; }
+.sys-card-body .val { color: #e6edf3; }
+
+/* Desktop: overlay on left side of camera */
+@media (min-width: 768px) {
+  #sys-panel {
+    position: absolute; left: 0; top: 0; height: 100%;
+    flex-direction: column; gap: 2px; margin-top: 0;
+    width: auto; max-width: 40%; pointer-events: none;
+    padding: 4px;
+  }
+  .sys-card {
+    flex: 1; min-height: 0; overflow: hidden;
+    padding: 3px 6px; pointer-events: auto;
+  }
+  .sys-card-title { font-size: 0.55rem; }
+  .sys-card-body { font-size: 0.55rem; line-height: 1.4; }
+  .sys-card-body .val { font-size: 0.55rem; }
+}

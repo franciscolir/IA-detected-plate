@@ -1,7 +1,4 @@
-:root { --bg: #0b0f14; --surface: #131a23; --accent: #00d26a; --text: #e6edf3; }
-body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
-a { color: #88ccff; }
-
+/* app.css - Estilos compartidos entre paginas */
 @keyframes plate-pop {
   0% { transform: scale(0.85); opacity: 0.5; }
   100% { transform: scale(1); opacity: 1; }

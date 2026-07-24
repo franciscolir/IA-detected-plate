@@ -1,3 +1,4 @@
+// ocr.js - Reconocimiento de caracteres PP-OCRv4 con preprocessing canvas y decode CTC
 import * as ort from 'onnxruntime-web';
 
 export class PlateOCR {
@@ -6,6 +7,10 @@ export class PlateOCR {
     this.chars = [''];
     this.inputHeight = 48;
     this.mock = true;
+
+    // Canvas reuse: evitar crear canvas nuevo en cada inferencia
+    this._srcCanvas = null;
+    this._dstCanvas = null;
   }
 
   async loadModel(modelPath) {
@@ -26,6 +31,14 @@ export class PlateOCR {
     return !this.mock;
   }
 
+  // Warmup: inferencia dummy para forzar JIT antes del primer frame real
+  async warmup() {
+    if (this.mock) return;
+    const dummyW = 100;
+    const dummy = new ort.Tensor('float32', new Float32Array(3 * this.inputHeight * dummyW), [1, 3, this.inputHeight, dummyW]);
+    await this.session.run({ [this.session.inputNames[0]]: dummy });
+  }
+
   async recognize(imageData) {
     if (this.mock) return '';
 
@@ -36,23 +49,27 @@ export class PlateOCR {
     return this._ctcGreedyDecode(output.data, output.dims);
   }
 
+  // Preprocessing: resize a altura fija (48px), mantiene aspect ratio, NCHW, normalizacion [-1,1]
   _preprocess(imageData) {
     const oldW = imageData.width;
     const oldH = imageData.height;
     const newH = this.inputHeight;
     const newW = Math.max(1, Math.round(oldW * (newH / oldH)));
 
-    const srcCanvas = document.createElement('canvas');
-    srcCanvas.width = oldW;
-    srcCanvas.height = oldH;
-    srcCanvas.getContext('2d').putImageData(imageData, 0, 0);
+    if (!this._srcCanvas) {
+      this._srcCanvas = document.createElement('canvas');
+      this._dstCanvas = document.createElement('canvas');
+    }
+    this._srcCanvas.width = oldW;
+    this._srcCanvas.height = oldH;
+    this._srcCanvas.getContext('2d').putImageData(imageData, 0, 0);
 
-    const dstCanvas = document.createElement('canvas');
-    dstCanvas.width = newW;
-    dstCanvas.height = newH;
-    dstCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, newW, newH);
+    this._dstCanvas.width = newW;
+    this._dstCanvas.height = newH;
+    const dstCtx = this._dstCanvas.getContext('2d', { willReadFrequently: true });
+    dstCtx.drawImage(this._srcCanvas, 0, 0, newW, newH);
 
-    const resized = dstCanvas.getContext('2d').getImageData(0, 0, newW, newH);
+    const resized = dstCtx.getImageData(0, 0, newW, newH);
     const pixels = resized.data;
 
     const nchw = new Float32Array(3 * newH * newW);
@@ -69,6 +86,8 @@ export class PlateOCR {
     return { data: nchw, shape: [1, 3, newH, newW] };
   }
 
+  // CTC greedy decode: por cada timestep, elegir el indice con mayor probabilidad
+  // Saltar blank (idx 0) y repetidos
   _ctcGreedyDecode(data, dims) {
     const timeSteps = dims[1];
     const vocabSize = dims[2];

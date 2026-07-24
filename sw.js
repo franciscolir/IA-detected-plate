@@ -1,5 +1,5 @@
-/* Service Worker - Offline First */
-const VERSION = 'v2.0.0';
+/* sw.js - Service Worker para caché offline */
+const VERSION = 'v3.0.0';
 const STATIC_CACHE = `static-${VERSION}`;
 const RUNTIME_CACHE = `runtime-${VERSION}`;
 const MODEL_CACHE = `models-${VERSION}`;
@@ -12,21 +12,28 @@ const STATIC_ASSETS = [
   '/test_detector.html',
   '/manifest.json',
   '/assets/css/app.css',
+  '/assets/css/index.css',
+  '/assets/css/test_camera.css',
+  '/assets/css/test_detector.css',
+  '/assets/css/test_ocr.css',
+  '/assets/js/app.js',
   '/assets/js/camera.js',
+  '/assets/js/corrector.js',
+  '/assets/js/database.js',
   '/assets/js/detector.js',
   '/assets/js/ocr.js',
   '/assets/js/validator.js',
-  '/assets/js/corrector.js',
-  '/assets/js/database.js',
-  '/assets/js/app.js',
-  '/assets/icons/icon-192.png',
-  '/assets/icons/icon-512.png',
+  '/assets/js/test_camera.js',
+  '/assets/js/test_detector.js',
+  '/assets/js/test_ocr.js',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css',
   'https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js',
-  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.mjs'
+  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/ort.min.mjs',
+  'https://cdn.jsdelivr.net/npm/dexie@4.0.8/dist/dexie.min.mjs'
 ];
 
 const MODEL_URLS = [
+  '/assets/models/yolov8_plate.onnx',
   '/assets/models/ppocr_rec.onnx',
   '/assets/models/ppocr_keys.json'
 ];
@@ -74,7 +81,7 @@ self.addEventListener('fetch', (event) => {
 async function safeCacheAll(cache, urls) {
   await Promise.all(
     urls.map(async (u) => {
-      try { await cache.add(u); } catch (_) { /* ignore missing */ }
+      try { await cache.add(u); } catch (_) {}
     })
   );
 }

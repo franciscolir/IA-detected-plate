@@ -1,5 +1,5 @@
 {
-  "name": "Reconocedor de Patentes Chilenas",
+  "name": "IA Detected Plate",
   "short_name": "PatentesCL",
   "description": "Reconocimiento de patentes chilenas en tiempo real, offline, sin backend.",
   "id": "/",
@@ -10,9 +10,5 @@
   "background_color": "#0b0f14",
   "theme_color": "#0b0f14",
   "lang": "es-CL",
-  "categories": ["productivity", "utilities"],
-  "icons": [
-    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+  "categories": ["productivity", "utilities"]
 }

@@ -1,3 +1,4 @@
+// detector.js - Detector de patentes YOLOv8 + fallback por proyeccion de bordes
 import * as ort from 'onnxruntime-web';
 
 export class PlateDetector {
@@ -6,15 +7,36 @@ export class PlateDetector {
     this.inputSize = options.inputSize || 640;
     this.confThreshold = options.confThreshold || 0.5;
     this.iouThreshold = options.iouThreshold || 0.45;
+
+    // Parametros del fallback (proyeccion de bordes)
     this.fbEdge = options.fbEdge ?? 0.08;
     this.fbRowFactor = options.fbRowFactor ?? 0.10;
     this.fbColFactor = options.fbColFactor ?? 0.12;
     this.fbMinHeight = options.fbMinHeight ?? 4;
     this.fbSizeLimit = options.fbSizeLimit ?? 0.95;
+
     this.mock = true;
     this._transform = null;
     this._smoothBox = null;
     this._debug = true;
+
+    // Frame skip: correr YOLO cada N frames, reutilizar caja cacheada entre tanto
+    this._yoloCounter = 0;
+    this._yoloSkip = 2;
+    this._lastGoodBox = null;
+    this._goodBoxAge = 0;
+
+    // Canvas reuse: evitar crear canvas nuevo en cada frame (reduce GC)
+    this._preprocCanvas = null;
+    this._preprocCtx = null;
+    this._fbCanvas = null;
+    this._fbCtx = null;
+    this._fbGray = null;
+    this._fbGrad = null;
+    this._fbRowCount = null;
+    this._fbColCount = null;
+    this._cropCanvas = null;
+    this._cropCtx = null;
   }
 
   async loadModel(modelPath) {
@@ -29,19 +51,42 @@ export class PlateDetector {
     return !this.mock;
   }
 
+  // Warmup: inferencia dummy para forzar JIT + asignacion de memoria antes del primer frame real
+  async warmup() {
+    if (this.mock) return;
+    const sz = this.inputSize;
+    const dummy = new ort.Tensor('float32', new Float32Array(3 * sz * sz), [1, 3, sz, sz]);
+    const feeds = {};
+    feeds[this.session.inputNames[0]] = dummy;
+    await this.session.run(feeds);
+  }
+
   async detect(video, canvasRef) {
     if (this.mock) {
       this._drawOverlay(canvasRef, []);
       return [];
     }
 
+    // Frame skip: si tenemos caja cacheada reciente, saltar YOLO este frame
+    this._yoloCounter++;
+    const skip = (this._yoloCounter % this._yoloSkip === 0) && this._lastGoodBox && this._goodBoxAge < 8;
+    if (skip) {
+      this._goodBoxAge++;
+      this._lastFallback = false;
+      const cached = { ...this._lastGoodBox };
+      this._drawOverlay(canvasRef, [cached], null);
+      return [cached];
+    }
+
+    // Preprocessing + inferencia YOLO
     const input = this._preprocess(video);
     const inputName = this.session.inputNames[0];
     const feeds = {};
     feeds[inputName] = input;
     const results = await this.session.run(feeds);
     const output = results[this.session.outputNames[0]];
-    if (this._debug) console.log(`[Detector] model input="${inputName}" output="${this.session.outputNames[0]}" dims=[${output.dims}]`);
+
+    // Decode + NMS + filtro por confianza y tamano
     const rawBoxes = this._decodeAll(output.data, output.dims);
     const nmsBoxes = this._nms(rawBoxes);
     const highConf = nmsBoxes.filter(b => b.score >= this.confThreshold);
@@ -51,6 +96,7 @@ export class PlateDetector {
       return w >= 30 && h >= 10 && w / h < 12;
     });
 
+    // Diagnosticos para el sys panel
     this._lastRawPreds = rawBoxes.length;
     this._lastMaxConf = rawBoxes.length ? Math.max(...rawBoxes.map(b => b.score)) : 0;
     this._lastFallback = mapped.length > 0 && rawBoxes.filter(b => b.score >= this.confThreshold).length === 0;
@@ -59,7 +105,7 @@ export class PlateDetector {
       console.log(`[Detector] preds=${rawBoxes.length} nms=${nmsBoxes.length} high=${highConf.length} maxConf=${(this._lastMaxConf*100).toFixed(1)}% over0.3=${over03}`);
     }
 
-    // Fallback + anti-parpadeo
+    // Fallback por proyeccion de bordes + anti-parpadeo (smoothing EMA)
     if (mapped.length === 0) {
       const fallback = this._detectFallback(video);
       if (fallback) {
@@ -87,6 +133,7 @@ export class PlateDetector {
         mapped.push({ x1: this._smoothBox.x1, y1: this._smoothBox.y1, x2: this._smoothBox.x2, y2: this._smoothBox.y2, score: this._smoothBox.score });
         if (this._debug) console.log(`[Detector] fallback: ${(this._smoothBox.score*100).toFixed(1)}%`);
       } else if (this._smoothBox) {
+        // Hang: mantener caja previa unos frames tras perder deteccion
         this._smoothBox.hangCount++;
         if (this._smoothBox.hangCount > 30) {
           this._smoothBox = null;
@@ -99,6 +146,14 @@ export class PlateDetector {
       this._smoothBox = null;
     }
 
+    // Actualizar caja cacheada para frame skip
+    if (mapped.length > 0) {
+      this._lastGoodBox = { ...mapped[0] };
+      this._goodBoxAge = 0;
+    } else {
+      this._goodBoxAge++;
+    }
+
     this._drawOverlay(canvasRef, mapped, rawBoxes);
     return mapped;
   }
@@ -106,6 +161,7 @@ export class PlateDetector {
   _vw(v) { return v.videoWidth || v.width || 0; }
   _vh(v) { return v.videoHeight || v.height || 0; }
 
+  // Preprocessing: letterbox a inputSize x inputSize, NCHW, normalizacion [0,1]
   _preprocess(video) {
     const vw = this._vw(video);
     const vh = this._vh(video);
@@ -117,10 +173,13 @@ export class PlateDetector {
 
     this._transform = { scale, ox, oy, vw, vh };
 
-    const canvas = document.createElement('canvas');
-    canvas.width = isz;
-    canvas.height = isz;
-    const ctx = canvas.getContext('2d');
+    if (!this._preprocCanvas) {
+      this._preprocCanvas = document.createElement('canvas');
+      this._preprocCtx = this._preprocCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    this._preprocCanvas.width = isz;
+    this._preprocCanvas.height = isz;
+    const ctx = this._preprocCtx;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, isz, isz);
     ctx.drawImage(video, ox, oy, vw * scale, vh * scale);
@@ -137,6 +196,7 @@ export class PlateDetector {
     return new ort.Tensor('float32', data, [1, 3, isz, isz]);
   }
 
+  // Decode: detecta formato (normalizado vs pixel) y convierte a cajas [x1,y1,x2,y2,score]
   _decodeAll(data, dims) {
     const numPreds = dims[2];
     const raw = [];
@@ -162,6 +222,7 @@ export class PlateDetector {
     return raw;
   }
 
+  // NMS: Non-Maximum Suppression, elimina cajas superpuestas
   _nms(detections) {
     detections.sort((a, b) => b.score - a.score);
     const picked = new Array(detections.length).fill(false);
@@ -179,6 +240,7 @@ export class PlateDetector {
     return result;
   }
 
+  // IoU: Intersection over Union entre dos cajas
   _iou(a, b) {
     const x1 = Math.max(a.x1, b.x1);
     const y1 = Math.max(a.y1, b.y1);
@@ -190,6 +252,7 @@ export class PlateDetector {
     return inter / (areaA + areaB - inter + 1e-6);
   }
 
+  // Mapear coordenadas del espacio del modelo al espacio original del video
   _toOriginal(box) {
     const t = this._transform;
     return {
@@ -201,12 +264,13 @@ export class PlateDetector {
     };
   }
 
+  // Dibujar cajas en el overlay: amarillo = alta confianza, tenue = baja confianza
   _drawOverlay(canvas, final, raw = null) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Filtered low-confidence boxes (semi-transparent)
+    // Cajas de baja confianza (semi-transparentes)
     if (raw) {
       for (const d of raw) {
         if (d.score < 0.2) continue;
@@ -220,7 +284,7 @@ export class PlateDetector {
       }
     }
 
-    // High-confidence boxes (solid yellow)
+    // Cajas de alta confianza (amarillo solido)
     for (const d of final) {
       const iw = d.x2 - d.x1;
       const ih = d.y2 - d.y1;
@@ -233,7 +297,7 @@ export class PlateDetector {
       ctx.fillText(`${(d.score * 100).toFixed(0)}%`, d.x1, d.y1 - 5);
     }
 
-    // Center crosshair
+    // Mira central
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -245,7 +309,7 @@ export class PlateDetector {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Status
+    // Estado: sin deteccion
     if (final.length === 0) {
       ctx.fillStyle = 'rgba(255,50,50,0.6)';
       ctx.font = '14px sans-serif';
@@ -253,27 +317,43 @@ export class PlateDetector {
     }
   }
 
+  // Fallback: deteccion por proyeccion de bordes (Sobel horizontal + densidad por fila/columna)
   _detectFallback(video) {
     const vw = this._vw(video);
     const vh = this._vh(video);
     if (vw < 50 || vh < 50) return null;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = vw;
-    canvas.height = vh;
-    const ctx = canvas.getContext('2d');
+    if (!this._fbCanvas) {
+      this._fbCanvas = document.createElement('canvas');
+      this._fbCtx = this._fbCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    this._fbCanvas.width = vw;
+    this._fbCanvas.height = vh;
+    const ctx = this._fbCtx;
     ctx.drawImage(video, 0, 0);
     const imageData = ctx.getImageData(0, 0, vw, vh);
     const data = imageData.data;
 
-    const gray = new Uint8Array(vw * vh);
-    for (let i = 0; i < vw * vh; i++) {
+    // Reusar buffers si las dimensiones no cambiaron
+    const total = vw * vh;
+    if (!this._fbGray || this._fbGray.length !== total) {
+      this._fbGray = new Uint8Array(total);
+      this._fbGrad = new Float32Array(total);
+      this._fbRowCount = new Uint16Array(vh);
+      this._fbColCount = new Uint16Array(vw);
+    }
+    const gray = this._fbGray;
+    const grad = this._fbGrad;
+    const rowCount = this._fbRowCount;
+    const colCount = this._fbColCount;
+
+    // Escala de grises (luminancia)
+    for (let i = 0; i < total; i++) {
       const pi = i << 2;
       gray[i] = (data[pi] * 0.299 + data[pi + 1] * 0.587 + data[pi + 2] * 0.114) | 0;
     }
 
-    // Horizontal gradient magnitude (edge detection)
-    const grad = new Float32Array(vw * vh);
+    // Gradiente horizontal (deteccion de bordes verticales)
     let maxGrad = 0;
     for (let y = 0; y < vh; y++) {
       for (let x = 0; x < vw - 1; x++) {
@@ -287,8 +367,7 @@ export class PlateDetector {
 
     const edgeThresh = maxGrad * this.fbEdge;
 
-    // Row edge density
-    const rowCount = new Uint16Array(vh);
+    // Densidad de bordes por fila -> detectar banda horizontal de la placa
     for (let y = 0; y < vh; y++) {
       let c = 0;
       for (let x = 0; x < vw; x++) { if (grad[y * vw + x] > edgeThresh) c++; }
@@ -309,8 +388,7 @@ export class PlateDetector {
     yS = Math.max(0, yS - 3);
     yE = Math.min(vh, yE + 3);
 
-    // Column edge density within band
-    const colCount = new Uint16Array(vw);
+    // Densidad de bordes por columna dentro de la banda -> detectar ancho de la placa
     for (let x = 0; x < vw; x++) {
       let c = 0;
       for (let y = yS; y < yE; y++) { if (grad[y * vw + x] > edgeThresh) c++; }
@@ -336,6 +414,7 @@ export class PlateDetector {
     if (pw < 10 || ph < this.fbMinHeight) return null;
     if (pw > vw * this.fbSizeLimit || ph > vh * this.fbSizeLimit) return null;
 
+    // Score: combina aspect ratio y densidad de bordes
     const aspect = pw / ph;
     const aspectScore = Math.max(0, 1 - Math.abs(aspect - 3.5) / 5);
     const densityScore = Math.min(1, (maxR + maxC) / (vw * 0.05 + vh * 0.5));
@@ -344,15 +423,18 @@ export class PlateDetector {
     return { x1: xS, y1: yS, x2: xE, y2: yE, score: Math.min(0.7, score) };
   }
 
+  // Recortar la region de la placa del video y devolver ImageData para OCR
   cropPlate(video, box) {
     const w = Math.round(box.x2 - box.x1);
     const h = Math.round(box.y2 - box.y1);
     if (w < 4 || h < 4) return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, box.x1, box.y1, w, h, 0, 0, w, h);
-    return ctx.getImageData(0, 0, w, h);
+    if (!this._cropCanvas) {
+      this._cropCanvas = document.createElement('canvas');
+      this._cropCtx = this._cropCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    this._cropCanvas.width = w;
+    this._cropCanvas.height = h;
+    this._cropCtx.drawImage(video, box.x1, box.y1, w, h, 0, 0, w, h);
+    return this._cropCtx.getImageData(0, 0, w, h);
   }
 }

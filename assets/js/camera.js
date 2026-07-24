@@ -1,4 +1,4 @@
-// camera.js - Control de camara con MediaDevices
+// camera.js - Control de camara con MediaDevices API
 export class Camera {
   constructor(videoElement) {
     this.video = videoElement;
@@ -20,6 +20,7 @@ export class Camera {
       this.video.srcObject = this.stream;
       await this.video.play();
 
+      // Activar linterna si el dispositivo lo soporta
       const track = this.stream.getVideoTracks()[0];
       if (track && 'torch' in track) {
         try { track.applyConstraints({ advanced: [{ torch: true }] }); } catch (_) {}

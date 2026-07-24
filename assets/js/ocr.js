@@ -1,3 +1,4 @@
+// ocr.js - Reconocimiento de caracteres PP-OCRv4 con preprocessing canvas y decode CTC
 import * as ort from 'onnxruntime-web';
 
 export class PlateOCR {
@@ -6,7 +7,8 @@ export class PlateOCR {
     this.chars = [''];
     this.inputHeight = 48;
     this.mock = true;
-    // #5 canvas reuse
+
+    // Canvas reuse: evitar crear canvas nuevo en cada inferencia
     this._srcCanvas = null;
     this._dstCanvas = null;
   }
@@ -29,11 +31,11 @@ export class PlateOCR {
     return !this.mock;
   }
 
-  // #10 warmup
+  // Warmup: inferencia dummy para forzar JIT antes del primer frame real
   async warmup() {
     if (this.mock) return;
-    const dw = 100;
-    const dummy = new ort.Tensor('float32', new Float32Array(3 * this.inputHeight * dw), [1, 3, this.inputHeight, dw]);
+    const dummyW = 100;
+    const dummy = new ort.Tensor('float32', new Float32Array(3 * this.inputHeight * dummyW), [1, 3, this.inputHeight, dummyW]);
     await this.session.run({ [this.session.inputNames[0]]: dummy });
   }
 
@@ -47,13 +49,13 @@ export class PlateOCR {
     return this._ctcGreedyDecode(output.data, output.dims);
   }
 
+  // Preprocessing: resize a altura fija (48px), mantiene aspect ratio, NCHW, normalizacion [-1,1]
   _preprocess(imageData) {
     const oldW = imageData.width;
     const oldH = imageData.height;
     const newH = this.inputHeight;
     const newW = Math.max(1, Math.round(oldW * (newH / oldH)));
 
-    // #5 reuse canvases
     if (!this._srcCanvas) {
       this._srcCanvas = document.createElement('canvas');
       this._dstCanvas = document.createElement('canvas');
@@ -84,6 +86,8 @@ export class PlateOCR {
     return { data: nchw, shape: [1, 3, newH, newW] };
   }
 
+  // CTC greedy decode: por cada timestep, elegir el indice con mayor probabilidad
+  // Saltar blank (idx 0) y repetidos
   _ctcGreedyDecode(data, dims) {
     const timeSteps = dims[1];
     const vocabSize = dims[2];

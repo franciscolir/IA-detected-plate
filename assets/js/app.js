@@ -1,3 +1,4 @@
+// app.js - Orquestador principal: camara -> detector -> OCR -> corrector -> streak -> display
 import { Camera } from './camera.js';
 import { PlateDetector } from './detector.js';
 import { PlateOCR } from './ocr.js';
@@ -24,19 +25,23 @@ let streakCandidate = null;
 let streakCount = 0;
 let streakRequired = 2;
 let noDetectLimit = 20;
+
+// Variables para diagnostico (sys panel)
 let lastRawText = '';
 let lastCorrected = '';
 let lastOCRValid = false;
-// #7 OCR skip when box stable
+
+// OCR skip: cuando el box es estable, no correr OCR cada frame
 let ocrCounter = 0;
 let ocrSkipInterval = 3;
 let lastBoxCenter = null;
 
-// Mobile detection
+// Deteccion de dispositivo movil para ajustes de rendimiento
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 document.getElementById('mode-label').textContent = isMobile ? 'MOVIL' : 'DESK';
 
 async function init() {
+  // En movil: resolucion baja + skip mas agresivo + OCR mas frecuente
   const resolution = isMobile ? '640x480' : await getConfig('resolution', '1280x720');
   const sensitivity = await getConfig('sensitivity', 0.15);
   if (isMobile) {
@@ -45,6 +50,7 @@ async function init() {
     streakRequired = await getConfig('streak', 2);
     noDetectLimit = await getConfig('noDetect', 20);
   }
+
   const corrections = await getConfig('corrections', {
     letter: { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '6': 'G', '8': 'B' },
     number: { 'O': '0', 'Q': '0', 'D': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'B': '8', 'G': '6' }
@@ -55,21 +61,28 @@ async function init() {
   if (isMobile) detector._yoloSkip = 3;
   ocr = new PlateOCR();
 
+  // Cargar modelos
   setLoading('Cargando detector...', 'YOLOv8');
   const detLoaded = await detector.loadModel(DETECTOR_MODEL);
 
   setLoading('Cargando OCR...', 'PP-OCRv4');
   const ocrLoaded = await ocr.loadModel(OCR_MODEL);
 
+  // Warmup: inferencia dummy con timeout de 8s (no bloquea la carga si falla)
   setLoading('Calentando modelos...', 'Warmup');
-  try { await Promise.race([
-    Promise.all([detector.warmup(), ocr.warmup()]),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('warmup timeout')), 8000))
-  ]); } catch (e) { console.warn('[App] warmup skipped:', e.message); }
+  try {
+    await Promise.race([
+      Promise.all([detector.warmup(), ocr.warmup()]),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('warmup timeout')), 8000))
+    ]);
+  } catch (e) {
+    console.warn('[App] warmup skipped:', e.message);
+  }
 
   setLoading('Modelos listos', '');
   setTimeout(hideLoading, 500);
 
+  // Sys panel: actualizar cada 2 segundos
   updateSysInfo();
   setInterval(updateSysInfo, 2000);
 
@@ -110,6 +123,7 @@ function stop() {
   setStatus('Detenido.');
 }
 
+// Loop principal: detectar -> crop -> OCR -> normalizar -> corregir -> streak -> mostrar
 async function loop() {
   if (!running) return;
   const video = camera.getVideo();
@@ -127,7 +141,7 @@ async function loop() {
       lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
     }
 
-    // #7 OCR skip when box stable
+    // OCR skip: si el box no se movio mas del 15%, saltar OCR cada N frames
     const center = { x: (box.x1 + box.x2) / 2, y: (box.y1 + box.y2) / 2 };
     const bw = box.x2 - box.x1, bh = box.y2 - box.y1;
     const isStable = lastBoxCenter &&
@@ -139,7 +153,7 @@ async function loop() {
     const skipOCR = isStable && (ocrCounter % ocrSkipInterval !== 0);
 
     if (skipOCR) {
-      // Use cached text, still update box position
+      // Usar texto cacheado, solo actualizar posicion del box
       if (lastPlate || streakCandidate) {
         lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
       }
@@ -158,6 +172,7 @@ async function loop() {
             if (corrected === streakCandidate) streakCount++;
             else { streakCandidate = corrected; streakCount = 1; }
 
+            // Streak: N lecturas identicas consecutivas para confirmar la placa
             if (streakCount >= streakRequired && streakCandidate !== lastPlate) {
               lastPlate = streakCandidate;
               lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
@@ -194,6 +209,7 @@ async function loop() {
   requestAnimationFrame(loop);
 }
 
+// Mostrar placa confirmada en el display CSS
 function showPlate(plate) {
   if (!plateEl) return;
   let letters = '', numbers = '';
@@ -216,6 +232,7 @@ function clearPlate() {
   plateEl.classList.remove('detected');
 }
 
+// Dibujar caja verde de confirmacion sobre la placa detectada
 function drawOverlay() {
   if (!lastPlate || !lastPlateBox) return;
   const ctx = overlayEl.getContext('2d');
@@ -238,12 +255,14 @@ function drawOverlay() {
   ctx.fillText(display, lx + 8, ly + 22);
 }
 
+// Formatear placa para display: insertar espacio entre letras y numeros
 function formatPlate(p) {
   if (/^[A-Z]{4}\d{2}$/.test(p)) return p.slice(0, 4) + ' ' + p.slice(4);
   if (/^[A-Z]{2}\d{4}$/.test(p)) return p.slice(0, 2) + ' ' + p.slice(2);
   return p;
 }
 
+// Sincronizar dimensiones del overlay con el video
 function resizeOverlay() {
   const video = camera.getVideo();
   if (video && video.videoWidth) {
@@ -254,11 +273,12 @@ function resizeOverlay() {
   }
 }
 
+// Sys panel: 3 cards con datos de app, dispositivo y navegador
 function updateSysInfo() {
   const det = detector || { mock: true, _lastRawPreds: 0, _lastMaxConf: 0, _lastFallback: false };
   const ocrMock = ocr ? ocr.mock : true;
-  const detStatus = det.mock ? '◌ MOCK' : '✓ OK';
-  const ocrStatus = ocrMock ? '◌ MOCK' : '✓ OK';
+  const detStatus = det.mock ? 'MOCK' : 'OK';
+  const ocrStatus = ocrMock ? 'MOCK' : 'OK';
   const appHtml =
     `<span class="label">Detector:</span> <span class="val">${detStatus}</span>\n` +
     `<span class="label">OCR:</span> <span class="val">${ocrStatus}</span>\n` +
@@ -266,11 +286,11 @@ function updateSysInfo() {
     `<span class="label">Max conf:</span> <span class="val">${((det._lastMaxConf || 0) * 100).toFixed(1)}%</span>\n` +
     `<span class="label">OCR raw:</span> <span class="val">"${lastRawText}"</span>\n` +
     `<span class="label">Placa:</span> <span class="val">"${lastCorrected}"</span>\n` +
-    `<span class="label">Streak:</span> <span class="val">${streakCount}/${streakRequired} ${lastOCRValid ? '🟢' : '⚪'}</span>\n` +
+    `<span class="label">Streak:</span> <span class="val">${streakCount}/${streakRequired} ${lastOCRValid ? 'OK' : '--'}</span>\n` +
     `<span class="label">FPS:</span> <span class="val">${frameCount}</span>`;
   document.getElementById('sys-app').innerHTML = appHtml;
 
-  // Device info (collected once)
+  // Info del dispositivo (RAM, CPU, GPU, plataforma)
   const mem = navigator.deviceMemory !== undefined ? navigator.deviceMemory + ' GB' : 'N/D';
   const cpu = navigator.hardwareConcurrency || 'N/D';
   let gpu = 'N/D';
@@ -286,17 +306,17 @@ function updateSysInfo() {
     `<span class="label">Plataforma:</span> <span class="val">${navigator.platform || 'N/D'}</span>`;
   document.getElementById('sys-device').innerHTML = deviceHtml;
 
-  // Browser info
+  // Info del navegador (UA, WebGL, WebGPU, WASM, pantalla)
   const ua = navigator.userAgent;
   const shortUA = ua.length > 80 ? ua.slice(0, 80) + '...' : ua;
-  const webglOk = (() => { try { return !!document.createElement('canvas').getContext('webgl'); } catch(_) { return false; } })();
+  const webglOk = (() => { try { return !!document.createElement('canvas').getContext('webgl'); } catch (_) { return false; } })();
   const webgpuOk = !!navigator.gpu;
   const wasmOk = typeof WebAssembly === 'object' && typeof WebAssembly.instantiate === 'function';
   const browserHtml =
     `<span class="label">UA:</span> <span class="val">${shortUA}</span>\n` +
-    `<span class="label">WebGL:</span> <span class="val">${webglOk ? '✓' : '✗'}</span>\n` +
-    `<span class="label">WebGPU:</span> <span class="val">${webgpuOk ? '✓' : '✗'}</span>\n` +
-    `<span class="label">WASM:</span> <span class="val">${wasmOk ? '✓' : '✗'}</span>\n` +
+    `<span class="label">WebGL:</span> <span class="val">${webglOk ? 'si' : 'no'}</span>\n` +
+    `<span class="label">WebGPU:</span> <span class="val">${webgpuOk ? 'si' : 'no'}</span>\n` +
+    `<span class="label">WASM:</span> <span class="val">${wasmOk ? 'si' : 'no'}</span>\n` +
     `<span class="label">Screen:</span> <span class="val">${screen.width}x${screen.height}</span>\n` +
     `<span class="label">DPR:</span> <span class="val">${window.devicePixelRatio || 1}</span>`;
   document.getElementById('sys-browser').innerHTML = browserHtml;

@@ -1,3 +1,4 @@
+// database.js - Persistencia de config con Dexie (IndexedDB)
 import Dexie from 'https://cdn.jsdelivr.net/npm/dexie@4.0.8/dist/dexie.min.mjs';
 
 const DB_NAME = 'PlateDetector';
@@ -19,6 +20,7 @@ export async function initDB() {
   if (d) await d.open();
 }
 
+// Si Dexie/IndexedDB no esta disponible, devuelve el valor por defecto
 export async function getConfig(key, defaultVal) {
   const d = getDB();
   if (!d) return defaultVal;

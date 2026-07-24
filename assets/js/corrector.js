@@ -1,3 +1,7 @@
+// corrector.js - Correccion de caracteres OCR por zona (letras vs numeros)
+// Las patentes chilenas tienen formato ABCD12 (4 letras + 2 numeros) o AB1234 (2 letras + 4 numeros)
+// El OCR confunde caracteres visualmente similares (O/0, I/1, B/8, etc.)
+
 const DEFAULT_LETTER_CORRECTIONS = {
   '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '6': 'G', '8': 'B'
 };
@@ -13,6 +17,7 @@ export class Corrector {
     if (corrections) this._loadCorrections(corrections);
   }
 
+  // Cargar correcciones custom desde config (formato { letter: {...}, number: {...} } o plano)
   _loadCorrections(corrections) {
     if (corrections.letter && corrections.number) {
       Object.assign(this.letterCorrections, corrections.letter);
@@ -28,6 +33,8 @@ export class Corrector {
     }
   }
 
+  // Detectar zonas: cuantas letras al inicio y cuantos numeros al final
+  // Retorna { letterRange: [start, end], numberRange: [start, end] } o null si no hay zonas claras
   _detectZones(text) {
     let numCount = 0;
     for (let i = text.length - 1; i >= 0; i--) {
@@ -44,6 +51,8 @@ export class Corrector {
       : null;
   }
 
+  // Corregir texto: si detecta zonas, aplica correccion por posicion
+  // Si no detecta zonas, aplica correccion por caracter con ambos mapas
   correct(text) {
     const clean = text.replace(/[\s-]/g, '').toUpperCase();
     const zones = this._detectZones(clean);

@@ -27,6 +27,10 @@ let noDetectLimit = 20;
 let lastRawText = '';
 let lastCorrected = '';
 let lastOCRValid = false;
+// #7 OCR skip when box stable
+let ocrCounter = 0;
+let ocrSkipInterval = 3;
+let lastBoxCenter = null;
 
 async function init() {
   const resolution = await getConfig('resolution', '1280x720');
@@ -47,6 +51,9 @@ async function init() {
 
   setLoading('Cargando OCR...', 'PP-OCRv4');
   const ocrLoaded = await ocr.loadModel(OCR_MODEL);
+
+  setLoading('Calentando modelos...', 'Warmup');
+  await Promise.all([detector.warmup(), ocr.warmup()]);
 
   setLoading('Modelos listos', '');
   setTimeout(hideLoading, 500);
@@ -108,33 +115,51 @@ async function loop() {
       lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
     }
 
-    const crop = detector.cropPlate(video, box);
-    if (crop) {
-      const rawText = await ocr.recognize(crop);
-      lastRawText = rawText || '(vacio)';
-      if (rawText) {
-        const normalized = normalizePlate(rawText);
-        const corrected = corrector.correct(normalized);
-        lastCorrected = corrected || '(vacio)';
-        lastOCRValid = validatePlate(corrected) && corrected.length === 6;
+    // #7 OCR skip when box stable
+    const center = { x: (box.x1 + box.x2) / 2, y: (box.y1 + box.y2) / 2 };
+    const bw = box.x2 - box.x1, bh = box.y2 - box.y1;
+    const isStable = lastBoxCenter &&
+      Math.abs(center.x - lastBoxCenter.x) < bw * 0.15 &&
+      Math.abs(center.y - lastBoxCenter.y) < bh * 0.15;
+    lastBoxCenter = center;
 
-        if (lastOCRValid) {
-          if (corrected === streakCandidate) streakCount++;
-          else { streakCandidate = corrected; streakCount = 1; }
+    ocrCounter++;
+    const skipOCR = isStable && (ocrCounter % ocrSkipInterval !== 0);
 
-          if (streakCount >= streakRequired && streakCandidate !== lastPlate) {
-            lastPlate = streakCandidate;
-            lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
-            showPlate(lastPlate);
-            streakCount = 0;
+    if (skipOCR) {
+      // Use cached text, still update box position
+      if (lastPlate || streakCandidate) {
+        lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
+      }
+    } else {
+      const crop = detector.cropPlate(video, box);
+      if (crop) {
+        const rawText = await ocr.recognize(crop);
+        lastRawText = rawText || '(vacio)';
+        if (rawText) {
+          const normalized = normalizePlate(rawText);
+          const corrected = corrector.correct(normalized);
+          lastCorrected = corrected || '(vacio)';
+          lastOCRValid = validatePlate(corrected) && corrected.length === 6;
+
+          if (lastOCRValid) {
+            if (corrected === streakCandidate) streakCount++;
+            else { streakCandidate = corrected; streakCount = 1; }
+
+            if (streakCount >= streakRequired && streakCandidate !== lastPlate) {
+              lastPlate = streakCandidate;
+              lastPlateBox = { x1: box.x1, y1: box.y1, x2: box.x2, y2: box.y2 };
+              showPlate(lastPlate);
+              streakCount = 0;
+            }
+          } else {
+            streakCandidate = null; streakCount = 0;
           }
         } else {
+          lastCorrected = '(vacio)';
+          lastOCRValid = false;
           streakCandidate = null; streakCount = 0;
         }
-      } else {
-        lastCorrected = '(vacio)';
-        lastOCRValid = false;
-        streakCandidate = null; streakCount = 0;
       }
     }
   } else {

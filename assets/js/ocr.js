@@ -6,6 +6,9 @@ export class PlateOCR {
     this.chars = [''];
     this.inputHeight = 48;
     this.mock = true;
+    // #5 canvas reuse
+    this._srcCanvas = null;
+    this._dstCanvas = null;
   }
 
   async loadModel(modelPath) {
@@ -26,6 +29,14 @@ export class PlateOCR {
     return !this.mock;
   }
 
+  // #10 warmup
+  async warmup() {
+    if (this.mock) return;
+    const dw = 100;
+    const dummy = new ort.Tensor('float32', new Float32Array(3 * this.inputHeight * dw), [1, 3, this.inputHeight, dw]);
+    await this.session.run({ [this.session.inputNames[0]]: dummy });
+  }
+
   async recognize(imageData) {
     if (this.mock) return '';
 
@@ -42,17 +53,21 @@ export class PlateOCR {
     const newH = this.inputHeight;
     const newW = Math.max(1, Math.round(oldW * (newH / oldH)));
 
-    const srcCanvas = document.createElement('canvas');
-    srcCanvas.width = oldW;
-    srcCanvas.height = oldH;
-    srcCanvas.getContext('2d').putImageData(imageData, 0, 0);
+    // #5 reuse canvases
+    if (!this._srcCanvas) {
+      this._srcCanvas = document.createElement('canvas');
+      this._dstCanvas = document.createElement('canvas');
+    }
+    this._srcCanvas.width = oldW;
+    this._srcCanvas.height = oldH;
+    this._srcCanvas.getContext('2d').putImageData(imageData, 0, 0);
 
-    const dstCanvas = document.createElement('canvas');
-    dstCanvas.width = newW;
-    dstCanvas.height = newH;
-    dstCanvas.getContext('2d').drawImage(srcCanvas, 0, 0, newW, newH);
+    this._dstCanvas.width = newW;
+    this._dstCanvas.height = newH;
+    const dstCtx = this._dstCanvas.getContext('2d', { willReadFrequently: true });
+    dstCtx.drawImage(this._srcCanvas, 0, 0, newW, newH);
 
-    const resized = dstCanvas.getContext('2d').getImageData(0, 0, newW, newH);
+    const resized = dstCtx.getImageData(0, 0, newW, newH);
     const pixels = resized.data;
 
     const nchw = new Float32Array(3 * newH * newW);

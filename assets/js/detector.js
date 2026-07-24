@@ -15,6 +15,22 @@ export class PlateDetector {
     this._transform = null;
     this._smoothBox = null;
     this._debug = true;
+    // #2 frame skip
+    this._yoloCounter = 0;
+    this._yoloSkip = 2;
+    this._lastGoodBox = null;
+    this._goodBoxAge = 0;
+    // #5 canvas reuse
+    this._preprocCanvas = null;
+    this._preprocCtx = null;
+    this._fbCanvas = null;
+    this._fbCtx = null;
+    this._fbGray = null;
+    this._fbGrad = null;
+    this._fbRowCount = null;
+    this._fbColCount = null;
+    this._cropCanvas = null;
+    this._cropCtx = null;
   }
 
   async loadModel(modelPath) {
@@ -29,10 +45,31 @@ export class PlateDetector {
     return !this.mock;
   }
 
+  // #10 warmup - run dummy inference to trigger JIT + memory alloc
+  async warmup() {
+    if (this.mock) return;
+    const sz = this.inputSize;
+    const dummy = new ort.Tensor('float32', new Float32Array(3 * sz * sz), [1, 3, sz, sz]);
+    const feeds = {};
+    feeds[this.session.inputNames[0]] = dummy;
+    await this.session.run(feeds);
+  }
+
   async detect(video, canvasRef) {
     if (this.mock) {
       this._drawOverlay(canvasRef, []);
       return [];
+    }
+
+    // #2 frame skip - reuse last good box on odd frames
+    this._yoloCounter++;
+    const skip = (this._yoloCounter % this._yoloSkip === 0) && this._lastGoodBox && this._goodBoxAge < 8;
+    if (skip) {
+      this._goodBoxAge++;
+      this._lastFallback = false;
+      const cached = { ...this._lastGoodBox };
+      this._drawOverlay(canvasRef, [cached], null);
+      return [cached];
     }
 
     const input = this._preprocess(video);
@@ -41,7 +78,6 @@ export class PlateDetector {
     feeds[inputName] = input;
     const results = await this.session.run(feeds);
     const output = results[this.session.outputNames[0]];
-    if (this._debug) console.log(`[Detector] model input="${inputName}" output="${this.session.outputNames[0]}" dims=[${output.dims}]`);
     const rawBoxes = this._decodeAll(output.data, output.dims);
     const nmsBoxes = this._nms(rawBoxes);
     const highConf = nmsBoxes.filter(b => b.score >= this.confThreshold);
@@ -99,6 +135,14 @@ export class PlateDetector {
       this._smoothBox = null;
     }
 
+    // #2 update cached box
+    if (mapped.length > 0) {
+      this._lastGoodBox = { ...mapped[0] };
+      this._goodBoxAge = 0;
+    } else {
+      this._goodBoxAge++;
+    }
+
     this._drawOverlay(canvasRef, mapped, rawBoxes);
     return mapped;
   }
@@ -117,10 +161,14 @@ export class PlateDetector {
 
     this._transform = { scale, ox, oy, vw, vh };
 
-    const canvas = document.createElement('canvas');
-    canvas.width = isz;
-    canvas.height = isz;
-    const ctx = canvas.getContext('2d');
+    // #5 reuse canvas
+    if (!this._preprocCanvas) {
+      this._preprocCanvas = document.createElement('canvas');
+      this._preprocCtx = this._preprocCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    this._preprocCanvas.width = isz;
+    this._preprocCanvas.height = isz;
+    const ctx = this._preprocCtx;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, isz, isz);
     ctx.drawImage(video, ox, oy, vw * scale, vh * scale);
@@ -258,22 +306,36 @@ export class PlateDetector {
     const vh = this._vh(video);
     if (vw < 50 || vh < 50) return null;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = vw;
-    canvas.height = vh;
-    const ctx = canvas.getContext('2d');
+    // #5 reuse canvas + buffers
+    if (!this._fbCanvas) {
+      this._fbCanvas = document.createElement('canvas');
+      this._fbCtx = this._fbCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    this._fbCanvas.width = vw;
+    this._fbCanvas.height = vh;
+    const ctx = this._fbCtx;
     ctx.drawImage(video, 0, 0);
     const imageData = ctx.getImageData(0, 0, vw, vh);
     const data = imageData.data;
 
-    const gray = new Uint8Array(vw * vh);
-    for (let i = 0; i < vw * vh; i++) {
+    const total = vw * vh;
+    if (!this._fbGray || this._fbGray.length !== total) {
+      this._fbGray = new Uint8Array(total);
+      this._fbGrad = new Float32Array(total);
+      this._fbRowCount = new Uint16Array(vh);
+      this._fbColCount = new Uint16Array(vw);
+    }
+    const gray = this._fbGray;
+    const grad = this._fbGrad;
+    const rowCount = this._fbRowCount;
+    const colCount = this._fbColCount;
+
+    for (let i = 0; i < total; i++) {
       const pi = i << 2;
       gray[i] = (data[pi] * 0.299 + data[pi + 1] * 0.587 + data[pi + 2] * 0.114) | 0;
     }
 
     // Horizontal gradient magnitude (edge detection)
-    const grad = new Float32Array(vw * vh);
     let maxGrad = 0;
     for (let y = 0; y < vh; y++) {
       for (let x = 0; x < vw - 1; x++) {
@@ -288,7 +350,6 @@ export class PlateDetector {
     const edgeThresh = maxGrad * this.fbEdge;
 
     // Row edge density
-    const rowCount = new Uint16Array(vh);
     for (let y = 0; y < vh; y++) {
       let c = 0;
       for (let x = 0; x < vw; x++) { if (grad[y * vw + x] > edgeThresh) c++; }
@@ -310,7 +371,6 @@ export class PlateDetector {
     yE = Math.min(vh, yE + 3);
 
     // Column edge density within band
-    const colCount = new Uint16Array(vw);
     for (let x = 0; x < vw; x++) {
       let c = 0;
       for (let y = yS; y < yE; y++) { if (grad[y * vw + x] > edgeThresh) c++; }
@@ -348,11 +408,13 @@ export class PlateDetector {
     const w = Math.round(box.x2 - box.x1);
     const h = Math.round(box.y2 - box.y1);
     if (w < 4 || h < 4) return null;
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, box.x1, box.y1, w, h, 0, 0, w, h);
-    return ctx.getImageData(0, 0, w, h);
+    if (!this._cropCanvas) {
+      this._cropCanvas = document.createElement('canvas');
+      this._cropCtx = this._cropCanvas.getContext('2d', { willReadFrequently: true });
+    }
+    this._cropCanvas.width = w;
+    this._cropCanvas.height = h;
+    this._cropCtx.drawImage(video, box.x1, box.y1, w, h, 0, 0, w, h);
+    return this._cropCtx.getImageData(0, 0, w, h);
   }
 }

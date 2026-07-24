@@ -53,7 +53,10 @@ async function init() {
   const ocrLoaded = await ocr.loadModel(OCR_MODEL);
 
   setLoading('Calentando modelos...', 'Warmup');
-  await Promise.all([detector.warmup(), ocr.warmup()]);
+  try { await Promise.race([
+    Promise.all([detector.warmup(), ocr.warmup()]),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('warmup timeout')), 8000))
+  ]); } catch (e) { console.warn('[App] warmup skipped:', e.message); }
 
   setLoading('Modelos listos', '');
   setTimeout(hideLoading, 500);

@@ -32,11 +32,18 @@ let ocrCounter = 0;
 let ocrSkipInterval = 3;
 let lastBoxCenter = null;
 
+// Mobile detection
+const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 async function init() {
-  const resolution = await getConfig('resolution', '1280x720');
+  const resolution = isMobile ? '640x480' : await getConfig('resolution', '1280x720');
   const sensitivity = await getConfig('sensitivity', 0.15);
-  streakRequired = await getConfig('streak', 2);
-  noDetectLimit = await getConfig('noDetect', 20);
+  if (isMobile) {
+    ocrSkipInterval = 2;
+  } else {
+    streakRequired = await getConfig('streak', 2);
+    noDetectLimit = await getConfig('noDetect', 20);
+  }
   const corrections = await getConfig('corrections', {
     letter: { '0': 'O', '1': 'I', '2': 'Z', '5': 'S', '6': 'G', '8': 'B' },
     number: { 'O': '0', 'Q': '0', 'D': '0', 'I': '1', 'L': '1', 'Z': '2', 'S': '5', 'B': '8', 'G': '6' }
@@ -44,6 +51,7 @@ async function init() {
 
   corrector = new Corrector(corrections);
   detector = new PlateDetector({ inputSize: 640, confThreshold: sensitivity });
+  if (isMobile) detector._yoloSkip = 3;
   ocr = new PlateOCR();
 
   setLoading('Cargando detector...', 'YOLOv8');
@@ -76,7 +84,7 @@ function setupEvents() {
 }
 
 async function start() {
-  const resolution = await getConfig('resolution', '1280x720');
+  const resolution = isMobile ? '640x480' : await getConfig('resolution', '1280x720');
   const fpsCfg = await getConfig('fps', 30);
   await camera.start(resolution, fpsCfg);
   running = true;

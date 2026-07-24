@@ -34,6 +34,7 @@ let lastBoxCenter = null;
 
 // Mobile detection
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+document.getElementById('mode-label').textContent = isMobile ? 'MOVIL' : 'DESK';
 
 async function init() {
   const resolution = isMobile ? '640x480' : await getConfig('resolution', '1280x720');
